@@ -45,3 +45,9 @@
 - **Help key:** Press `?` or `h` in-game to see item templates and inventory controls
 - **Inventory UI:** Interactive overlay (i key) shows equipped items (★), allows equip/unequip/use/drop actions
 - **No action needed:** Raj's item system is already complete; help screen displays existing templates and loot data
+
+### Equipment Stat Application Architecture
+- **Public API:** `applyEquipmentMods(entity, item)` and `removeEquipmentMods(entity, item)` are clean wrappers around the internal `_applyStatMods(entity, mods, direction)` helper.
+- **Stat categories:** `hp`/`mana`/`stamina` mods adjust both current and max values with clamping. All other stats (`attack`, `defense`, `speed`) are applied/removed additively.
+- **Symmetry guarantee:** `equipItem()` calls `applyEquipmentMods` (+1 direction), `unequipItem()` calls `removeEquipmentMods` (-1 direction). When replacing an item in the same slot, `unequipItem` is called first to cleanly reverse old mods before applying new ones.
+- **Monster loot drops:** `dropLoot(monster, floorIndex)` rolls for loot when a monster dies. 35% base drop chance for normal monsters, 100% for bosses. Normal monsters drop 1 item (15% chance of 2), bosses drop 2-4. Items are placed at the monster's position via `GameState.addGroundItem()`. Combat system should call `ItemSystem.dropLoot(victim, victim.floor)` in `onKill` when a monster dies.

@@ -531,6 +531,25 @@
     return true;
   }
 
+  // ── Equipment Stat Modifiers ─────────────────────────────────
+
+  /**
+   * Apply an item's stat modifiers to an entity (on equip).
+   * Handles attack, defense, speed directly and hp/mana/stamina
+   * by adjusting both current and max values.
+   */
+  function applyEquipmentMods(entity, item) {
+    _applyStatMods(entity, item.statMods, 1);
+  }
+
+  /**
+   * Remove an item's stat modifiers from an entity (on unequip).
+   * Symmetrically reverses applyEquipmentMods.
+   */
+  function removeEquipmentMods(entity, item) {
+    _applyStatMods(entity, item.statMods, -1);
+  }
+
   /**
    * Equip an item (must match a valid slot). Swaps if slot is occupied.
    */
@@ -550,14 +569,14 @@
     const idx = entity.inventory.indexOf(item);
     if (idx !== -1) entity.inventory.splice(idx, 1);
 
-    // Unequip current item in that slot (if any)
+    // Unequip current item in that slot — removeEquipmentMods is called inside
     if (entity.equipment[slot]) {
       unequipItem(entity, slot);
     }
 
     // Equip and apply stat mods
     entity.equipment[slot] = item;
-    _applyStatMods(entity, item.statMods, 1);
+    applyEquipmentMods(entity, item);
     GameState.addMessage(`Equipped ${getDisplayName(item)}.`, 'loot');
     return true;
   }
@@ -573,7 +592,7 @@
     }
 
     // Remove stat mods
-    _applyStatMods(entity, item.statMods, -1);
+    removeEquipmentMods(entity, item);
 
     // Move to inventory
     entity.equipment[slot] = null;
@@ -656,6 +675,48 @@
     return false;
   }
 
+  // ── Monster Loot Drops ───────────────────────────────────────
+
+  /**
+   * Roll for loot when a monster dies. Returns an array of items
+   * placed at the monster's position on the ground.
+   * @param {object} monster - the dead monster entity
+   * @param {number} floorIndex - 0-indexed floor number
+   * @returns {object[]} array of dropped items (already added to ground)
+   */
+  function dropLoot(monster, floorIndex) {
+    const dropped = [];
+    const rng = Utils.createRNG(Date.now() + (monster.id || 0));
+
+    // Base drop chance: 35%. Bosses always drop.
+    const isBoss = monster.tags && monster.tags.includes('boss');
+    const dropChance = isBoss ? 1.0 : 0.35;
+    if (rng.random() > dropChance) return dropped;
+
+    // Number of items: bosses drop 2-4, normal monsters drop 1 (rare 2)
+    let count;
+    if (isBoss) {
+      count = rng.randInt(2, 4);
+    } else {
+      count = rng.random() < 0.15 ? 2 : 1;
+    }
+
+    for (let i = 0; i < count; i++) {
+      const item = _generateSingleItem(floorIndex, rng);
+      if (!item) continue;
+      item.x = monster.x;
+      item.y = monster.y;
+      item.floor = monster.floor;
+      GameState.addGroundItem(item);
+      dropped.push(item);
+
+      const displayName = getDisplayName(item);
+      GameState.addMessage(`${monster.name} dropped ${displayName}!`, 'loot');
+    }
+
+    return dropped;
+  }
+
   // ── Initialization ──────────────────────────────────────────
 
   /**
@@ -675,6 +736,7 @@
     // Loot generation
     generateLoot,
     placeItemsOnFloor,
+    dropLoot,
 
     // Inventory management
     pickupItem,
@@ -682,6 +744,10 @@
     equipItem,
     unequipItem,
     useItem,
+
+    // Equipment stat modifiers
+    applyEquipmentMods,
+    removeEquipmentMods,
 
     // Identification
     identifyItem,
