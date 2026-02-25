@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dungeon Crawler</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #111; }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #000;
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- Core (load order matters) -->
+  <script src="src/core/constants.js"></script>
+  <script src="src/core/utils.js"></script>
+  <script src="src/core/gameState.js"></script>
+
+  <!-- Dungeon -->
+  <script src="src/dungeon/generator.js"></script>
+
+  <!-- Future scripts loaded here by other team members -->
+  <!-- <script src="src/rendering/renderer.js"></script> -->
+  <!-- <script src="src/entities/player.js"></script> -->
+  <!-- <script src="src/entities/monsters.js"></script> -->
+  <!-- <script src="src/systems/combat.js"></script> -->
+  <!-- <script src="src/systems/fov.js"></script> -->
+  <!-- <script src="src/ui/hud.js"></script> -->
+  <!-- <script src="src/ui/inventory.js"></script> -->
+  <!-- <script src="src/main.js"></script> -->
+
+  <script>
+    // Bootstrap: verify all modules loaded
+    (function () {
+      const modules = ['Constants', 'Utils', 'GameState', 'DungeonGenerator'];
+      const missing = modules.filter(m => !window[m]);
+      if (missing.length) {
+        console.error('Missing modules:', missing.join(', '));
+        return;
+      }
+      console.log('All core modules loaded.');
+
+      // Quick smoke test: generate floor 1 and log stats
+      const testData = DungeonGenerator.generate(0, 42);
+      console.log(`Floor 1: ${testData.rooms.length} rooms, stairs down at (${testData.stairs.down.x}, ${testData.stairs.down.y})`);
+    })();
+  </script>
+</body>
+</html>
