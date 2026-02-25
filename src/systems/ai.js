@@ -192,7 +192,7 @@
     // Low HP — retreat and heal if possible
     if (hpPercent < 0.3) {
       // Try to heal
-      if (entity.abilities.includes('heal') && entity.mana >= 20) {
+      if (entity.abilities.includes('heal') && entity.mana >= 30) {
         CombatSystem.useAbility('heal', entity, entity);
         return;
       }
@@ -259,30 +259,32 @@
     }
   }
 
-  function behaviorBoss(entity, player, tiles) {
-    const dist = Utils.chebyshevDist(entity.x, entity.y, player.x, player.y);
-    const hpPercent = entity.hp / entity.maxHp;
-
-    // Phase 2: at 50% HP, summon minions (once)
-    if (hpPercent <= 0.5 && !entity._summonedMinions) {
-      entity._summonedMinions = true;
-      GameState.addMessage(`${entity.name} roars and summons minions!`, 'combat');
-      // Spawn 2 dragon whelps nearby
-      const neighbours = Utils.getAllNeighbours(entity.x, entity.y);
-      let summoned = 0;
-      for (const n of neighbours) {
-        if (summoned >= 2) break;
-        if (n.x < 0 || n.x >= MAP_WIDTH || n.y < 0 || n.y >= MAP_HEIGHT) continue;
-        if (!WALKABLE_TILES.has(tiles[n.y][n.x])) continue;
-        if (GameState.getEntityAt(n.x, n.y, entity.floor)) continue;
-        const minion = window.MonsterFactory.createMonster('dragon_whelp', entity.floor, n.x, n.y);
-        if (minion) {
-          GameState.addEntity(minion);
-          summoned++;
-        }
+  // ── Boss Minion Summoning Helper ────────────────────────────
+  function summonMinions(entity, tiles, count) {
+    const neighbours = Utils.getAllNeighbours(entity.x, entity.y);
+    let summoned = 0;
+    for (const n of neighbours) {
+      if (summoned >= count) break;
+      if (n.x < 0 || n.x >= MAP_WIDTH || n.y < 0 || n.y >= MAP_HEIGHT) continue;
+      if (!WALKABLE_TILES.has(tiles[n.y][n.x])) continue;
+      if (GameState.getEntityAt(n.x, n.y, entity.floor)) continue;
+      const minion = window.MonsterFactory.createMonster('dragon_whelp', entity.floor, n.x, n.y);
+      if (minion) {
+        GameState.addEntity(minion);
+        summoned++;
       }
-      return; // Summoning takes the turn
     }
+    return summoned;
+  }
+
+  function countActiveMinions(entity) {
+    return GameState.getEntitiesOnFloor(entity.floor)
+      .filter(e => e.type === 'monster' && e.alive && e.templateKey === 'dragon_whelp').length;
+  }
+
+  // ── Boss Regular Action Helper ────────────────────────────
+  function bossRegularAction(entity, player, tiles) {
+    const dist = Utils.chebyshevDist(entity.x, entity.y, player.x, player.y);
 
     // Use war_cry if not buffed
     if (!CombatSystem.hasStatus(entity, 'buffed') && entity.abilities.includes('war_cry') && entity.stamina >= 25) {
@@ -311,6 +313,81 @@
 
     // Move toward player
     moveToward(entity, player.x, player.y, tiles);
+  }
+
+  function behaviorBoss(entity, player, tiles) {
+    const dist = Utils.chebyshevDist(entity.x, entity.y, player.x, player.y);
+    const hpPct = entity.hp / entity.maxHp;
+
+    // Enrage at 25% HP: +2 speed, attacks twice per turn
+    if (hpPct <= 0.25 && !entity._enraged) {
+      entity._enraged = true;
+      entity.speed += 2;
+      GameState.addMessage(`${entity.name} enters a furious rage! Speed increased!`, 'combat');
+    }
+
+    const activeMinions = countActiveMinions(entity);
+
+    // Phase 2: summon 2 minions at 50% HP
+    if (hpPct <= 0.5 && !entity._summonedPhase2) {
+      entity._summonedPhase2 = true;
+      const toSummon = Math.min(2, 4 - activeMinions);
+      if (toSummon > 0) {
+        GameState.addMessage(`${entity.name} roars and summons minions!`, 'combat');
+        summonMinions(entity, tiles, toSummon);
+      }
+      return; // Summoning takes the turn
+    }
+
+    // Phase 3: summon 3 minions at 25% HP (respecting cap of 4 active)
+    if (hpPct <= 0.25 && !entity._summonedPhase3) {
+      entity._summonedPhase3 = true;
+      const toSummon = Math.min(3, 4 - countActiveMinions(entity));
+      if (toSummon > 0) {
+        GameState.addMessage(`${entity.name} roars and summons more minions!`, 'combat');
+        summonMinions(entity, tiles, toSummon);
+      }
+      return;
+    }
+
+    // Execute telegraphed heavy attack
+    if (entity._telegraphing) {
+      entity._telegraphing = false;
+      if (dist <= 1) {
+        const rawDmg = Math.floor(CombatSystem.calcBaseDamage(entity, player) * 3);
+        const dealt = CombatSystem.applyDamage(player, rawDmg);
+        CombatSystem.postAttackMsg(entity, player, dealt, `${entity.name} unleashes a devastating attack on ${player.name} for ${dealt} damage!`);
+        if (!player.alive) {
+          GameState.addMessage(`${player.name} is slain!`, 'combat');
+        }
+      } else {
+        CombatSystem.aoeAttack(entity, player.x, player.y, 2, 2.5, entity.floor);
+        GameState.addMessage(`${entity.name} breathes a torrent of fire!`, 'combat');
+      }
+      // Enraged boss gets a second action even after telegraph
+      if (entity._enraged && player.alive) {
+        bossRegularAction(entity, player, tiles);
+      }
+      return;
+    }
+
+    // Chance to telegraph a heavy attack below 50% HP
+    if (hpPct <= 0.5 && Math.random() < 0.2) {
+      entity._telegraphing = true;
+      GameState.addMessage(`${entity.name} draws a deep breath...`, 'combat');
+      if (entity._enraged && player.alive) {
+        bossRegularAction(entity, player, tiles);
+      }
+      return;
+    }
+
+    // Regular boss action
+    bossRegularAction(entity, player, tiles);
+
+    // Enraged: second attack
+    if (entity._enraged && player.alive) {
+      bossRegularAction(entity, player, tiles);
+    }
   }
 
   // ── AI Behavior Dispatch ──────────────────────────────────

@@ -19,6 +19,7 @@
 - **Save/Load:** JSON to localStorage key `dc_save`, auto-saves on `beforeunload`. Permadeath deletes save on death. High scores stored in `dc_highscores`.
 - **Script load order:** constants → utils → gameState → generator → fov → combat → ai → monsters → items → renderer → hud → main. FOV before combat (no dependency). Main must be last.
 - **Key files:** `src/systems/fov.js`, `src/rendering/renderer.js`, `src/ui/hud.js`, `src/main.js`
+- **Visual effects architecture:** Screen shake, floating damage numbers, and pulsing stairs all live in renderer.js. Shake uses a duration/intensity model that decays over 8 frames via linear interpolation — `triggerShake(intensity)` uses `Math.max` so concurrent shakes don't accumulate, the strongest wins. Damage number particles are stored in a flat array with `spawnTime` for time-based lifecycle (1 second, float up 40px, fade out). Stairs pulse uses stateless `Math.sin(Date.now() / 500)` for 0.7→1.0 opacity. Game loop in main.js checks `Renderer.hasActiveAnimations()` each frame to enable continuous rendering during effects, then returns to dirty-flag mode when idle. External systems call `Renderer.triggerShake(n)` and `Renderer.spawnDamageNumber(x, y, amount, type)` — type is one of `player_damage`, `enemy_damage`, `heal`, `critical`.
 
 ## Cross-Agent Updates (2026-02-25)
 
@@ -43,3 +44,25 @@
 - **Title screen controls:** Added a "Controls" quick-reference section between the start prompt and high scores, showing key bindings at a glance.
 - **HUD API expansion:** Added `toggleHelp`, `isHelpVisible`, `toggleInventory`, `isInventoryVisible`, `getInventoryIndex`, `setInventoryIndex`, `closeInventory` to `window.HUD`.
 - **ItemSystem integration:** Inventory UI uses `ItemSystem.getDisplayName()`, `equipItem()`, `unequipItem()`, `useItem()`, `dropItem()` with fallback guards for when ItemSystem isn't loaded.
+
+## Cross-Agent Updates (2026-02-25)
+
+### Visual Polish Integration (from Howard, combat-triggered effects)
+- **Screen shake:** Combat system calls `Renderer.triggerShake(intensity)` on damage hits (light 2/medium 4/strong 6)
+- **Floating damage numbers:** Combat system calls `Renderer.spawnDamageNumber(x, y, amount, type)` after combat resolution (type: player_damage/enemy_damage/heal/critical)
+- **Animation loop:** `Renderer.hasActiveAnimations()` checked each frame in main.js; continuous rendering during effects, dirty-flag mode when idle
+- **Guards:** Combat system wraps visual calls with `window.Renderer && Renderer.method()` for graceful degradation
+
+### Sheldon & Leonard Integration Points
+- **XP progression:** Sheldon's 1.25x XP curve + 0.3x floor scaling make end-game achievable; Leonard's combat correctly reads `victim.xpValue`
+- **Monster stats:** Leonard's monsters spawn with Sheldon-computed XP values that scale by floor index
+- **Combat feedback:** Leonard's attack messages show HP%, crits apply BLEED, status effects warn before expiring
+
+### Raj Integration Points
+- **Equipment:** Inventory UI wires to ItemSystem.equipItem/unequipItem which call applyEquipmentMods/removeEquipmentMods
+- **Loot display:** Inventory shows items with ItemSystem.getDisplayName() for proper identification display
+- **Item management:** Inventory UI calls ItemSystem.useItem(), dropItem(), pickupItem() for consumable handling
+
+### Amy Integration Points
+- **Test coverage:** 45+ new tests validate combat balance, item system, equipment stat application, loot drops, save/load
+- **All passing:** Tests include edge cases (empty inventory, no drops, invalid equipment), state transitions, RNG determinism, multi-floor scaling

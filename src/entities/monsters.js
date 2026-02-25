@@ -140,7 +140,7 @@
     });
 
     // Extra properties for AI/combat
-    monster.xpValue = Math.floor(template.xpValue * (1 + floorIndex * 0.1));
+    monster.xpValue = Math.floor(template.xpValue * (1 + floorIndex * 0.3));
     monster.templateKey = templateKey;
     monster.tags = [...(template.tags || [])];
     monster.statusEffects = [];

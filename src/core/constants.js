@@ -165,7 +165,7 @@
 
   // ── XP / Leveling ──────────────────────────────────────────
   const XP_PER_LEVEL = Object.freeze(
-    Array.from({ length: 20 }, (_, i) => Math.floor(50 * Math.pow(1.4, i)))
+    Array.from({ length: 20 }, (_, i) => Math.floor(50 * Math.pow(1.25, i)))
   );
 
   // ── Public API ─────────────────────────────────────────────

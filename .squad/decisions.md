@@ -272,3 +272,146 @@ Added three UI features to hud.js and main.js:
 - **Input interception:** When overlays are visible, game input is blocked. This is handled in main.js `handleKeyDown` before checking game phase input.
 - **HUD API expanded:** New public methods on `window.HUD`: `toggleHelp`, `isHelpVisible`, `toggleInventory`, `isInventoryVisible`, `getInventoryIndex`, `setInventoryIndex`, `closeInventory`.
 - **Key conflicts:** `h`/`H` now opens help instead of being available for other bindings. `?` was previously unused.
+
+---
+
+## 6. XP Progression Curve Fix
+
+**Author:** Sheldon (Lead + Dungeon Generation)  
+**Date:** 2025-07-16  
+**Status:** Implemented  
+
+The XP leveling curve used `Math.pow(1.4, i)` which grew exponentially too fast. By level 20, a player needed 29,881 XP per level while floor 10 monsters (with the old 0.1 floor scaling) only gave ~120-950 XP. Leveling past floor 7 was effectively impossible.
+
+### Changes
+
+**XP_PER_LEVEL curve (constants.js):** Changed multiplier from **1.4** to **1.25**.
+
+| Level | Old (1.4x) | New (1.25x) |
+|-------|-----------|-------------|
+| 1     | 50        | 50          |
+| 5     | 192       | 122         |
+| 10    | 1,033     | 372         |
+| 15    | 5,556     | 1,136       |
+| 20    | 29,881    | 3,469       |
+
+**Monster XP floor scaling (monsters.js):** Changed floor multiplier from **0.1** to **0.3** in `createMonster()`. Formula: `xpValue * (1 + floorIndex * 0.3)`
+
+### Rationale
+
+- 1.25x was chosen because 1.2 undershoots target ranges. 1.25 lands level 10 at 372 XP and level 20 at 3,469 XP — both achievable with normal encounter rates.
+- The 0.3 floor scaling ensures deeper floors feel rewarding. Players killing 10–15 late-game monsters per floor can realistically level up.
+
+### Impact
+
+- **combat.js** reads `victim.xpValue` on kill — benefits automatically.
+- **hud.js** displays `XP_PER_LEVEL` — shows correct new values automatically.
+
+---
+
+## 7. Equipment Stats & Monster Loot Drops
+
+**Author:** Raj (Items + Loot)  
+**Date:** 2025-07-24  
+**Status:** Implemented
+
+Added public `applyEquipmentMods(entity, item)` and `removeEquipmentMods(entity, item)` functions to `ItemSystem`. These cleanly wrap the internal stat modifier logic and are now the sole path for equipment stat changes in `equipItem()` and `unequipItem()`.
+
+Added `dropLoot(monster, floorIndex)` for monster loot drops on death.
+
+### Decisions
+
+1. **Equipment stat mods are applied via named public functions.** `applyEquipmentMods` and `removeEquipmentMods` are exported on `window.ItemSystem`. Other systems can call these directly if needed (e.g., cursed items, temporary equipment effects).
+
+2. **Slot replacement is safe.** When equipping into an occupied slot, `unequipItem` is called first, which calls `removeEquipmentMods` on the old item before `applyEquipmentMods` is called on the new one. Stats are always consistent.
+
+3. **Monster loot drops use `dropLoot(monster, floorIndex)`.** Returns an array of dropped items already placed on the ground. Drop chance: 35% for normal monsters, 100% for bosses. Normal monsters drop 1 item (15% chance of 2), bosses drop 2-4 items. Rarity scales with floor depth using existing loot tables.
+
+### Integration Notes
+
+- **Leonard (Combat):** Call `ItemSystem.dropLoot(victim, victim.floor)` inside `onKill()` when a monster dies (after XP award). The function handles ground item placement and loot messages automatically.
+- **Howard (Rendering):** Dropped items appear as ground items at the monster's death position — no rendering changes needed.
+- **Sheldon (Dungeon):** No changes needed. `dropLoot` reuses `_generateSingleItem` and existing loot table weights.
+
+---
+
+## 8. Combat Balance & Boss Mechanics Overhaul
+
+**Author:** Leonard (Combat + Enemy AI)
+**Date:** 2025-07-24
+**Status:** Implemented
+
+Major combat balance pass, combat feedback improvements, and boss mechanics enhancement across `combat.js` and `ai.js`.
+
+### Changes
+
+**Class Balance:**
+
+| Change | Before | After | Rationale |
+|--------|--------|-------|-----------|
+| Cleric Heal cost | 20 mana | 30 mana | No-cooldown 40HP heal was OP sustain |
+| Cleric Heal amount | 40 HP | 25 HP | Forces mana management |
+| Rogue Evade duration | 2 turns | 1 turn | 2 free dodges for 15 stamina was too much |
+| Warrior War Cry ATK | +5 | +7 | Compensates for melee-only risk |
+
+**New Status Effects:**
+
+- **BLEED**: Stacking DoT (2 dmg/turn, 3 turns). Triggered on critical hits. Multiple crits stack damage additively.
+- **VULNERABLE**: Target takes +25% damage for 3 turns. Applied in `applyDamage()` before shield calculations.
+
+**Combat Feedback:**
+
+- All attack messages now include `[X% HP]` suffix showing target health percentage.
+- Critical hits (dealt > 1.5x reference base damage) prefixed with `CRITICAL!` and auto-apply BLEED.
+- Status effects display `"is fading! (1 turn left)"` warning before expiring.
+- New `postAttackMsg()` helper exposed on `CombatSystem` for consistent formatting.
+- New `hpPercent()` helper exposed on `CombatSystem`.
+
+**Boss Mechanics (Dragon Lord):**
+
+- **Enrage at 25% HP**: +2 speed, attacks twice per turn (calls `bossRegularAction` twice).
+- **Telegraph**: 20% chance per turn below 50% HP to telegraph: `"Dragon Lord draws a deep breath..."`. Next turn executes 3x melee or 2.5x AoE fire breath.
+- **Scaled summons**: 2 whelps at 50% HP, 3 more at 25% HP, hard cap of 4 active minions (`countActiveMinions` check).
+- **Summon limit**: `_summonedPhase2` and `_summonedPhase3` flags prevent re-summoning. `Math.min(count, 4 - active)` enforces the cap.
+
+### Impact on Other Agents
+
+- **Howard (Rendering):** No HUD changes needed — status effects still live on `entity.statusEffects[]`. Two new types (`bleed`, `vulnerable`) may want visual indicators.
+- **Raj (Items):** No changes needed. `ItemSystem.tickBuffs()` call order unchanged.
+- **Sheldon (Core):** No core changes needed.
+
+---
+
+## 9. Visual Polish: Screen Shake, Damage Numbers, Pulsing Stairs
+
+**Author:** Howard (Rendering + Fog of War)  
+**Date:** 2025-07-17  
+**Status:** Implemented
+
+Added three visual juice systems to renderer.js with game loop integration in main.js.
+
+### 1. Screen Shake
+
+- `Renderer.triggerShake(intensity)` — intensity is pixel offset (2=light, 4=medium, 6=strong)
+- Decays linearly over 8 frames, applies random offset to camera each frame
+- Uses `Math.max` to prevent accumulation — strongest active shake wins
+- Shake offset resets to zero cleanly when duration expires
+
+### 2. Floating Damage Numbers
+
+- `Renderer.spawnDamageNumber(x, y, amount, type)` — x/y in tile coords
+- Types: `'player_damage'` (red), `'enemy_damage'` (white), `'heal'` (green), `'critical'` (yellow, larger font)
+- Particles float upward 40px and fade out over 1 second
+- Stored in a flat array, rendered on top of all tiles/entities, auto-removed when faded
+
+### 3. Pulsing Stairs
+
+- STAIRS_DOWN and STAIRS_UP tiles pulse opacity 0.7→1.0 when visible in FOV
+- Uses stateless `Math.sin(Date.now() / 500)` — no per-tile state needed
+- Only applies when tile is currently visible (not explored-but-fogged)
+
+### Impact on Other Agents
+
+- **Leonard (Combat/AI):** Can call `Renderer.triggerShake()` and `Renderer.spawnDamageNumber()` after combat resolution to add visual feedback. Guard with `window.Renderer && Renderer.triggerShake`.
+- **Main.js game loop:** Now checks `Renderer.hasActiveAnimations()` each frame. When animations are active, rendering is continuous. When idle, returns to dirty-flag mode (zero CPU).
+- **No new dependencies.** All effects are self-contained in renderer.js.

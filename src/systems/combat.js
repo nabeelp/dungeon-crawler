@@ -18,7 +18,9 @@
     shielded: { duration: 0, absorb: 0 },
     buffed:   { duration: 3, stat: 'attack', amount: 0 },
     evading:  { duration: 1 },
-    divine_shield: { duration: 2, reduction: 0.5 }
+    divine_shield: { duration: 2, reduction: 0.5 },
+    bleed:    { duration: 3, damage: 2 },
+    vulnerable: { duration: 3 }
   };
 
   // ── Bresenham's Line ──────────────────────────────────────
@@ -60,6 +62,15 @@
   function addStatusEffect(entity, type, opts) {
     initStatusEffects(entity);
     const effect = { type, ...STATUS_DEFAULTS[type], ...opts };
+    // Bleed stacks: increase damage on existing bleed
+    if (type === 'bleed') {
+      const existing = entity.statusEffects.find(e => e.type === 'bleed');
+      if (existing) {
+        existing.damage += effect.damage;
+        existing.duration = Math.max(existing.duration, effect.duration);
+        return;
+      }
+    }
     // Replace existing effect of same type
     entity.statusEffects = entity.statusEffects.filter(e => e.type !== type);
     entity.statusEffects.push(effect);
@@ -89,10 +100,25 @@
           GameState.addMessage(`${entity.name} dies from poison!`, 'combat');
         }
       }
+      // Bleed tick
+      if (effect.type === 'bleed' && effect.damage) {
+        entity.hp -= effect.damage;
+        GameState.addMessage(`${entity.name} takes ${effect.damage} bleed damage.`, 'combat');
+        if (entity.hp <= 0) {
+          entity.hp = 0;
+          entity.alive = false;
+          GameState.addMessage(`${entity.name} bleeds out!`, 'combat');
+        }
+      }
       effect.duration--;
       if (effect.duration <= 0) {
         expiring.push(effect);
         return false;
+      }
+      // Warn when 1 turn left
+      if (effect.duration === 1) {
+        const label = effect.type.charAt(0).toUpperCase() + effect.type.slice(1).replace('_', ' ');
+        GameState.addMessage(`${entity.name}'s ${label} is fading! (1 turn left)`, 'combat');
       }
       return true;
     });
@@ -123,6 +149,11 @@
       return 0;
     }
 
+    // Vulnerable: +25% damage taken
+    if (hasStatus(target, 'vulnerable')) {
+      damage = Math.floor(damage * 1.25);
+    }
+
     // Divine shield reduction
     if (hasStatus(target, 'divine_shield')) {
       const ds = getStatus(target, 'divine_shield');
@@ -151,6 +182,33 @@
     return damage;
   }
 
+  // ── Combat Feedback Helpers ───────────────────────────────
+  function hpPercent(entity) {
+    return Math.max(0, Math.round((entity.hp / entity.maxHp) * 100));
+  }
+
+  function calcReferenceDamage(attacker, defender) {
+    return Math.max(1, attacker.attack - Math.floor(defender.defense / 2));
+  }
+
+  function postAttackMsg(attacker, defender, dealt, customMsg) {
+    const pct = hpPercent(defender);
+    const refDmg = calcReferenceDamage(attacker, defender);
+    const isCrit = dealt > refDmg * 1.5;
+    const hpTag = ` [${pct}% HP]`;
+    const baseMsg = customMsg || `${attacker.name} hits ${defender.name} for ${dealt} damage`;
+    if (isCrit) {
+      GameState.addMessage(`CRITICAL! ${baseMsg}${hpTag}`, 'combat');
+      if (defender.alive) {
+        addStatusEffect(defender, 'bleed', { duration: 3, damage: 2 });
+        GameState.addMessage(`${defender.name} is bleeding!`, 'combat');
+      }
+    } else {
+      GameState.addMessage(`${baseMsg}${hpTag}`, 'combat');
+    }
+    return isCrit;
+  }
+
   // ── Melee Attack ──────────────────────────────────────────
   function meleeAttack(attacker, defender) {
     const dist = Utils.chebyshevDist(attacker.x, attacker.y, defender.x, defender.y);
@@ -163,7 +221,7 @@
     const dealt = applyDamage(defender, rawDmg);
 
     if (dealt > 0) {
-      GameState.addMessage(`${attacker.name} hits ${defender.name} for ${dealt} damage.`, 'combat');
+      postAttackMsg(attacker, defender, dealt);
     }
 
     if (!defender.alive) {
@@ -188,7 +246,7 @@
     const dealt = applyDamage(defender, rawDmg);
 
     if (dealt > 0) {
-      GameState.addMessage(`${attacker.name} shoots ${defender.name} for ${dealt} damage.`, 'combat');
+      postAttackMsg(attacker, defender, dealt, `${attacker.name} shoots ${defender.name} for ${dealt} damage`);
     }
 
     if (!defender.alive) {
@@ -208,7 +266,8 @@
         const rawDmg = Math.floor(calcBaseDamage(attacker, ent) * damageMultiplier);
         const dealt = applyDamage(ent, rawDmg);
         if (dealt > 0) {
-          GameState.addMessage(`${ent.name} takes ${dealt} AoE damage.`, 'combat');
+          const pct = hpPercent(ent);
+          GameState.addMessage(`${ent.name} takes ${dealt} AoE damage [${pct}% HP]`, 'combat');
         }
         if (!ent.alive) {
           onKill(attacker, ent);
@@ -268,7 +327,7 @@
         if (dist > 1) return fail('Too far for Power Strike.');
         const rawDmg = calcBaseDamage(user, target) * 2;
         const dealt = applyDamage(target, rawDmg);
-        GameState.addMessage(`${user.name} uses Power Strike on ${target.name} for ${dealt} damage!`, 'combat');
+        postAttackMsg(user, target, dealt, `${user.name} uses Power Strike on ${target.name} for ${dealt} damage!`);
         if (!target.alive) onKill(user, target);
         return true;
       }
@@ -284,7 +343,7 @@
         const rawDmg = calcBaseDamage(user, target);
         const dealt = applyDamage(target, rawDmg);
         addStatusEffect(target, 'stunned', { duration: 1 });
-        GameState.addMessage(`${user.name} bashes ${target.name} for ${dealt} damage and stuns them!`, 'combat');
+        postAttackMsg(user, target, dealt, `${user.name} bashes ${target.name} for ${dealt} damage and stuns them!`);
         if (!target.alive) onKill(user, target);
         return true;
       }
@@ -295,7 +354,7 @@
       cost: { stamina: 25 },
       type: 'self',
       execute(user) {
-        const amount = 5;
+        const amount = 7;
         user.attack += amount;
         addStatusEffect(user, 'buffed', { duration: 3, stat: 'attack', amount });
         GameState.addMessage(`${user.name} lets out a War Cry! Attack +${amount} for 3 turns.`, 'combat');
@@ -335,7 +394,7 @@
         const rawDmg = calcBaseDamage(user, target);
         const dealt = applyDamage(target, rawDmg);
         addStatusEffect(target, 'slowed', { duration: 3 });
-        GameState.addMessage(`${user.name} hurls an Ice Shard at ${target.name} for ${dealt} damage! Target slowed.`, 'combat');
+        postAttackMsg(user, target, dealt, `${user.name} hurls an Ice Shard at ${target.name} for ${dealt} damage! Target slowed`);
         if (!target.alive) onKill(user, target);
         return true;
       }
@@ -368,7 +427,7 @@
         const rawDmg = Math.floor(calcBaseDamage(user, target) * multiplier);
         const dealt = applyDamage(target, rawDmg);
         const msg = isBehind ? 'Backstab (from behind)' : 'Backstab';
-        GameState.addMessage(`${user.name} uses ${msg} on ${target.name} for ${dealt} damage!`, 'combat');
+        postAttackMsg(user, target, dealt, `${user.name} uses ${msg} on ${target.name} for ${dealt} damage!`);
         if (!target.alive) onKill(user, target);
         return true;
       }
@@ -379,7 +438,7 @@
       cost: { stamina: 15 },
       type: 'self',
       execute(user) {
-        addStatusEffect(user, 'evading', { duration: 2 });
+        addStatusEffect(user, 'evading', { duration: 1 });
         GameState.addMessage(`${user.name} prepares to evade the next attack.`, 'combat');
         return true;
       }
@@ -395,7 +454,7 @@
         const rawDmg = calcBaseDamage(user, target);
         const dealt = applyDamage(target, rawDmg);
         addStatusEffect(target, 'poisoned', { duration: 5, damage: 3 });
-        GameState.addMessage(`${user.name} poisons ${target.name} for ${dealt} damage! Poisoned for 5 turns.`, 'combat');
+        postAttackMsg(user, target, dealt, `${user.name} poisons ${target.name} for ${dealt} damage! Poisoned for 5 turns`);
         if (!target.alive) onKill(user, target);
         return true;
       }
@@ -404,10 +463,10 @@
     // ── Cleric ──
     heal: {
       name: 'Heal',
-      cost: { mana: 20 },
+      cost: { mana: 30 },
       type: 'self',
       execute(user) {
-        const amount = Math.min(40, user.maxHp - user.hp);
+        const amount = Math.min(25, user.maxHp - user.hp);
         user.hp += amount;
         GameState.addMessage(`${user.name} heals for ${amount} HP.`, 'combat');
         return true;
@@ -426,7 +485,7 @@
         const rawDmg = Math.floor(calcBaseDamage(user, target) * multiplier);
         const dealt = applyDamage(target, rawDmg);
         const extra = isUndead ? ' (holy damage vs undead!)' : '';
-        GameState.addMessage(`${user.name} smites ${target.name} for ${dealt} damage!${extra}`, 'combat');
+        postAttackMsg(user, target, dealt, `${user.name} smites ${target.name} for ${dealt} damage!${extra}`);
         if (!target.alive) onKill(user, target);
         return true;
       }
@@ -553,6 +612,8 @@
     hasLineOfSight,
     bresenhamLine,
     calcBaseDamage,
-    applyDamage
+    applyDamage,
+    hpPercent,
+    postAttackMsg
   });
 })();

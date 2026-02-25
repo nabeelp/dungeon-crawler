@@ -47,6 +47,11 @@
   function gameLoop() {
     if (!running) return;
 
+    // Continuous rendering during active animations (shake, particles)
+    if (Renderer.hasActiveAnimations()) {
+      needsRender = true;
+    }
+
     if (needsRender) {
       Renderer.render(visibleTiles);
       HUD.render(visibleTiles);
