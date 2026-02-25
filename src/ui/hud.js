@@ -29,6 +29,13 @@
     classKeys: ['WARRIOR', 'MAGE', 'ROGUE', 'CLERIC']
   };
 
+  // Help screen state
+  let showHelp = false;
+
+  // Inventory UI state
+  let showInventory = false;
+  let inventoryIndex = 0;
+
   // High scores
   let highScores = [];
 
@@ -98,6 +105,14 @@
 
     if (phase === PHASES.COMBAT) {
       drawCombatIndicator(ctx, w, h);
+    }
+
+    // Overlay screens (drawn on top of game HUD)
+    if (showHelp) {
+      drawHelpScreen(ctx, w, h);
+    }
+    if (showInventory) {
+      drawInventoryScreen(ctx, w, h, player);
     }
   }
 
@@ -351,10 +366,21 @@
     ctx.font = '12px monospace';
     ctx.fillText('↑↓ Select Class  |  TAB Name Input  |  ENTER Start', w / 2, nameY + 95);
 
+    // Controls quick-reference
+    const ctrlY = nameY + 120;
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText('── Controls ──', w / 2, ctrlY);
+    ctx.fillStyle = '#AAA';
+    ctx.font = '12px monospace';
+    ctx.fillText('Move: Arrow Keys / WASD    Abilities: 1-3', w / 2, ctrlY + 20);
+    ctx.fillText('Pick Up: G    Stairs: > <    Inventory: I', w / 2, ctrlY + 36);
+    ctx.fillText('Wait: Space    Help: ?', w / 2, ctrlY + 52);
+
     // High scores
     loadHighScores();
     if (highScores.length > 0) {
-      const hsY = nameY + 130;
+      const hsY = ctrlY + 80;
       ctx.fillStyle = '#FFD700';
       ctx.font = 'bold 16px monospace';
       ctx.fillText('── High Scores ──', w / 2, hsY);
@@ -440,12 +466,271 @@
       + GameState.getTurnCounter();
   }
 
+  // ── Help Screen Overlay ─────────────────────────────────────
+  function drawHelpScreen(ctx, w, h) {
+    // Semi-transparent dark background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
+    ctx.fillRect(0, 0, w, h);
+
+    const cx = w / 2;
+    let y = 30;
+    const lineH = 18;
+    const sectionGap = 10;
+
+    // Title
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 28px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('HOW TO PLAY', cx, y);
+    y += 40;
+
+    function sectionTitle(text) {
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('── ' + text + ' ──', cx, y);
+      y += lineH + 2;
+    }
+
+    function helpLine(text, color) {
+      ctx.fillStyle = color || '#CCC';
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, cx, y);
+      y += lineH;
+    }
+
+    // MOVEMENT & EXPLORATION
+    sectionTitle('MOVEMENT & EXPLORATION');
+    helpLine('Arrow Keys or WASD to move');
+    helpLine('Walk into enemies to attack (melee)');
+    helpLine('> or .  to descend stairs (stand on gold > tile)');
+    helpLine('< or ,  to ascend stairs (stand on silver < tile)');
+    helpLine('G  to pick up items from the ground');
+    helpLine('Space or 5  to wait one turn');
+    y += sectionGap;
+
+    // COMBAT
+    sectionTitle('COMBAT');
+    helpLine('Walk into enemies to perform a basic melee attack');
+    helpLine('Press 1-3 to use class abilities (auto-targets nearest visible enemy)');
+    helpLine('Each class has 3 unique abilities that cost mana or stamina');
+    helpLine('Warrior: 1=Power Strike  2=Shield Bash  3=War Cry', '#FF8844');
+    helpLine('Mage:    1=Fireball(AoE) 2=Ice Shard    3=Arcane Shield', '#6699FF');
+    helpLine('Rogue:   1=Backstab      2=Evade        3=Poison Blade', '#66FF66');
+    helpLine('Cleric:  1=Heal          2=Smite        3=Divine Shield', '#FFFF66');
+    y += sectionGap;
+
+    // INVENTORY & ITEMS
+    sectionTitle('INVENTORY & ITEMS');
+    helpLine('I  to open inventory');
+    helpLine('In inventory: ↑↓ select, E equip/unequip, U use, D drop, Esc close');
+    helpLine('Items on the ground appear as yellow dots');
+    helpLine('Potions and scrolls start UNIDENTIFIED — use to reveal');
+    helpLine('⚠ Unidentified items may be harmful! (poison, curses)', '#FF6666');
+    y += sectionGap;
+
+    // GAME INFO
+    sectionTitle('GAME INFO');
+    helpLine('Permadeath: when you die, it\'s over. Score is saved.');
+    helpLine('Explore 10 floors of increasing difficulty');
+    helpLine('Enemies get stronger each floor — gear up!');
+    helpLine('Save is automatic when you close the browser');
+    helpLine('?  or  H  to toggle this help screen');
+    y += sectionGap + 4;
+
+    // Close hint
+    ctx.fillStyle = '#66FF66';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Press ? , H , or Esc to close', cx, y);
+  }
+
+  // ── Inventory Screen Overlay ────────────────────────────────
+  function drawInventoryScreen(ctx, w, h, player) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
+    ctx.fillRect(0, 0, w, h);
+
+    const cx = w / 2;
+    const panelW = Math.min(500, w - 40);
+    const panelX = cx - panelW / 2;
+    let y = 30;
+
+    // Title
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 24px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('INVENTORY', cx, y);
+    y += 36;
+
+    const items = player.inventory || [];
+
+    if (items.length === 0) {
+      ctx.fillStyle = '#888';
+      ctx.font = '14px monospace';
+      ctx.fillText('Your inventory is empty.', cx, y + 40);
+    } else {
+      // Clamp selection index
+      if (inventoryIndex >= items.length) inventoryIndex = Math.max(0, items.length - 1);
+
+      const lineH = 22;
+      const listTop = y;
+      const maxVisible = Math.min(items.length, Math.floor((h - 200) / lineH));
+
+      // Scrolling: determine visible window
+      let scrollOffset = 0;
+      if (items.length > maxVisible) {
+        scrollOffset = Math.max(0, Math.min(inventoryIndex - Math.floor(maxVisible / 2), items.length - maxVisible));
+      }
+
+      for (let vi = 0; vi < maxVisible; vi++) {
+        const i = vi + scrollOffset;
+        if (i >= items.length) break;
+        const item = items[i];
+        const iy = listTop + vi * lineH;
+
+        const isSelected = (i === inventoryIndex);
+
+        // Highlight selected row
+        if (isSelected) {
+          ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+          ctx.fillRect(panelX, iy - 2, panelW, lineH);
+        }
+
+        // Check if equipped
+        const equipped = isItemEquipped(player, item);
+        const marker = equipped ? '★ ' : '  ';
+
+        // Item name
+        const displayName = (window.ItemSystem && ItemSystem.getDisplayName)
+          ? ItemSystem.getDisplayName(item) : item.name;
+
+        ctx.fillStyle = isSelected ? '#FFD700' : '#CCC';
+        ctx.font = (isSelected ? 'bold ' : '') + '13px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(marker + displayName, panelX + 8, iy + 4);
+
+        // Slot / type info on the right
+        const slotLabel = item.slot || item.type || '';
+        ctx.fillStyle = '#888';
+        ctx.font = '11px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(slotLabel, panelX + panelW - 8, iy + 4);
+      }
+
+      // Item detail panel for selected item
+      const detailY = listTop + maxVisible * lineH + 16;
+      const selectedItem = items[inventoryIndex];
+      if (selectedItem) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.fillRect(panelX, detailY, panelW, 80);
+        ctx.strokeStyle = '#555';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(panelX, detailY, panelW, 80);
+
+        const displayName = (window.ItemSystem && ItemSystem.getDisplayName)
+          ? ItemSystem.getDisplayName(selectedItem) : selectedItem.name;
+
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 13px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(displayName, panelX + 10, detailY + 14);
+
+        // Description
+        if (selectedItem.description) {
+          ctx.fillStyle = '#AAA';
+          ctx.font = '11px monospace';
+          ctx.fillText(selectedItem.description, panelX + 10, detailY + 32);
+        }
+
+        // Stats
+        const stats = [];
+        if (selectedItem.statMods) {
+          for (const [key, val] of Object.entries(selectedItem.statMods)) {
+            if (val !== 0) stats.push(key + (val > 0 ? '+' : '') + val);
+          }
+        }
+        if (selectedItem.rarity) stats.push('[' + selectedItem.rarity + ']');
+
+        if (stats.length > 0) {
+          ctx.fillStyle = '#8CF';
+          ctx.font = '11px monospace';
+          ctx.fillText(stats.join('  '), panelX + 10, detailY + 50);
+        }
+
+        // Equipped indicator
+        if (isItemEquipped(player, selectedItem)) {
+          ctx.fillStyle = '#66FF66';
+          ctx.font = 'bold 11px monospace';
+          ctx.fillText('[ EQUIPPED ]', panelX + 10, detailY + 66);
+        }
+      }
+    }
+
+    // Controls at the bottom
+    ctx.fillStyle = '#888';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('↑↓ Select  |  E Equip  |  U Use  |  D Drop  |  Esc Close', cx, h - 30);
+  }
+
+  function isItemEquipped(player, item) {
+    if (!player.equipment) return false;
+    for (const slot of Object.keys(player.equipment)) {
+      if (player.equipment[slot] && player.equipment[slot].id === item.id) return true;
+    }
+    return false;
+  }
+
+  // ── Help / Inventory Toggles ────────────────────────────────
+  function toggleHelp() {
+    showHelp = !showHelp;
+    if (showHelp) showInventory = false;
+  }
+
+  function isHelpVisible() {
+    return showHelp;
+  }
+
+  function toggleInventory() {
+    showInventory = !showInventory;
+    if (showInventory) {
+      showHelp = false;
+      inventoryIndex = 0;
+    }
+  }
+
+  function isInventoryVisible() {
+    return showInventory;
+  }
+
+  function getInventoryIndex() {
+    return inventoryIndex;
+  }
+
+  function setInventoryIndex(idx) {
+    inventoryIndex = idx;
+  }
+
+  function closeInventory() {
+    showInventory = false;
+  }
+
   window.HUD = Object.freeze({
     render,
     getTitleState,
     resetTitleState,
     saveHighScore,
     getHighScores,
-    calculateScore
+    calculateScore,
+    toggleHelp,
+    isHelpVisible,
+    toggleInventory,
+    isInventoryVisible,
+    getInventoryIndex,
+    setInventoryIndex,
+    closeInventory
   });
 })();

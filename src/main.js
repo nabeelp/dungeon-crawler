@@ -510,6 +510,21 @@
       return;
     }
 
+    // Help overlay intercepts all input when visible
+    if (HUD.isHelpVisible()) {
+      if (e.key === '?' || e.key === 'h' || e.key === 'H' || e.key === 'Escape') {
+        HUD.toggleHelp();
+        requestRender();
+      }
+      return;
+    }
+
+    // Inventory overlay intercepts all input when visible
+    if (HUD.isInventoryVisible()) {
+      handleInventoryInput(e);
+      return;
+    }
+
     // In-game input
     if (phase === PHASES.EXPLORING || phase === PHASES.COMBAT) {
       handleGameInput(e);
@@ -557,6 +572,20 @@
   function handleGameInput(e) {
     const key = e.key;
 
+    // Help toggle
+    if (key === '?' || key === 'h' || key === 'H') {
+      HUD.toggleHelp();
+      requestRender();
+      return;
+    }
+
+    // Inventory toggle
+    if (key === 'i' || key === 'I') {
+      HUD.toggleInventory();
+      requestRender();
+      return;
+    }
+
     // Movement (arrow keys + WASD)
     const moveMap = {
       'ArrowUp':    { dx: 0, dy: -1 },
@@ -602,23 +631,115 @@
       processPlayerAction({ type: 'ability', index: parseInt(key) - 1 });
       return;
     }
+  }
 
-    // Inventory (toggle)
-    if (key === 'i' || key === 'I') {
-      if (window.InventoryUI && InventoryUI.toggle) {
-        InventoryUI.toggle();
-      } else {
-        // Show basic inventory in message log
-        const player = GameState.getPlayer();
-        if (player && player.inventory.length > 0) {
-          GameState.addMessage('Inventory: ' + player.inventory.map(i => i.name).join(', '), 'system');
-        } else {
-          GameState.addMessage('Inventory is empty.', 'system');
-        }
-        requestRender();
-      }
+  // ── Inventory Input Handling ───────────────────────────────
+  function handleInventoryInput(e) {
+    const key = e.key;
+    const player = GameState.getPlayer();
+    if (!player) return;
+
+    const items = player.inventory || [];
+    let idx = HUD.getInventoryIndex();
+
+    // Close inventory
+    if (key === 'Escape' || key === 'i' || key === 'I') {
+      HUD.closeInventory();
+      requestRender();
       return;
     }
+
+    // Navigate
+    if (key === 'ArrowUp') {
+      e.preventDefault();
+      if (items.length > 0) {
+        idx = (idx - 1 + items.length) % items.length;
+        HUD.setInventoryIndex(idx);
+      }
+      requestRender();
+      return;
+    }
+    if (key === 'ArrowDown') {
+      e.preventDefault();
+      if (items.length > 0) {
+        idx = (idx + 1) % items.length;
+        HUD.setInventoryIndex(idx);
+      }
+      requestRender();
+      return;
+    }
+
+    if (items.length === 0) return;
+    if (idx >= items.length) idx = items.length - 1;
+    const item = items[idx];
+    if (!item) return;
+
+    // Equip / Unequip
+    if (key === 'e' || key === 'E') {
+      if (isItemEquippedMain(player, item)) {
+        // Unequip
+        if (window.ItemSystem && ItemSystem.unequipItem && item.slot) {
+          ItemSystem.unequipItem(player, item.slot);
+          GameState.addMessage('Unequipped ' + ((window.ItemSystem && ItemSystem.getDisplayName) ? ItemSystem.getDisplayName(item) : item.name) + '.', 'loot');
+        }
+      } else {
+        // Equip
+        if (window.ItemSystem && ItemSystem.equipItem) {
+          ItemSystem.equipItem(player, item);
+        } else if (item.slot) {
+          player.equipment[item.slot] = item;
+          GameState.addMessage('Equipped ' + item.name + '.', 'loot');
+        }
+      }
+      requestRender();
+      return;
+    }
+
+    // Use item (potions/scrolls/food)
+    if (key === 'u' || key === 'U') {
+      if (window.ItemSystem && ItemSystem.useItem) {
+        ItemSystem.useItem(player, item);
+      } else {
+        GameState.addMessage('Cannot use ' + item.name + '.', 'system');
+      }
+      // Clamp index after removal
+      if (HUD.getInventoryIndex() >= player.inventory.length) {
+        HUD.setInventoryIndex(Math.max(0, player.inventory.length - 1));
+      }
+      requestRender();
+      return;
+    }
+
+    // Drop item
+    if (key === 'd' || key === 'D') {
+      if (window.ItemSystem && ItemSystem.dropItem) {
+        ItemSystem.dropItem(player, item);
+      } else {
+        // Fallback: manual drop
+        const dropIdx = player.inventory.indexOf(item);
+        if (dropIdx !== -1) {
+          player.inventory.splice(dropIdx, 1);
+          item.x = player.x;
+          item.y = player.y;
+          item.floor = player.floor;
+          GameState.addGroundItem(item);
+          GameState.addMessage('Dropped ' + item.name + '.', 'loot');
+        }
+      }
+      if (HUD.getInventoryIndex() >= player.inventory.length) {
+        HUD.setInventoryIndex(Math.max(0, player.inventory.length - 1));
+      }
+      requestRender();
+      return;
+    }
+  }
+
+  function isItemEquippedMain(player, item) {
+    if (!player.equipment) return false;
+    for (const slot of Object.keys(player.equipment)) {
+      if (player.equipment[slot] && player.equipment[slot].id === item.id) return true;
+    }
+    return false;
   }
 
   // ── Public API ─────────────────────────────────────────────

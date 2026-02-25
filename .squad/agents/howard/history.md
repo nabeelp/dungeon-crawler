@@ -35,3 +35,11 @@
 - **Inventory UI:** Wire to `ItemSystem.equipItem()`, `unequipItem()`, `useItem()`, `dropItem()`, `pickupItem()`
 - **Buff system:** Call `ItemSystem.tickBuffs(entity)` once per turn for all entities (after status effect ticks)
 - **Display:** Show buff/debuff icons and timers from `entity._buffs[]` in HUD
+
+### Help Screen + Inventory UI + Title Controls (2026-02-25)
+- **Help overlay:** Toggle via `?`/`h`/`H` during gameplay. Full-screen dark overlay with organized sections (Movement, Combat, Inventory, Game Info). Color-coded class abilities. Close with `?`/`h`/`Esc`. Uses boolean flag `showHelp` in hud.js — no game phase change needed.
+- **Inventory UI:** Toggle via `i` during gameplay. Full-screen overlay listing all inventory items with ★ markers for equipped gear. Arrow keys navigate, `e` equip/unequip, `u` use consumables, `d` drop. Detail panel shows item stats, description, rarity, equipped status. Scrolling for large inventories. Uses `showInventory` + `inventoryIndex` state in hud.js.
+- **Input interception pattern:** When help or inventory overlays are visible, `handleKeyDown` in main.js intercepts input before game input processing. Overlays are mutually exclusive (opening one closes the other).
+- **Title screen controls:** Added a "Controls" quick-reference section between the start prompt and high scores, showing key bindings at a glance.
+- **HUD API expansion:** Added `toggleHelp`, `isHelpVisible`, `toggleInventory`, `isInventoryVisible`, `getInventoryIndex`, `setInventoryIndex`, `closeInventory` to `window.HUD`.
+- **ItemSystem integration:** Inventory UI uses `ItemSystem.getDisplayName()`, `equipItem()`, `unequipItem()`, `useItem()`, `dropItem()` with fallback guards for when ItemSystem isn't loaded.
