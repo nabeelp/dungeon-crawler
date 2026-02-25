@@ -39,3 +39,9 @@
 - **Floor setup:** Sheldon calls `ItemSystem.placeItemsOnFloor(floorIndex, rooms, rng)` after dungeon generation
 - **Room-based:** ItemSystem scatters loot into room interiors, avoiding walls and corridors
 - **Quantity/rarity:** Scales per floor — deeper floors have more epic/legendary drops
+
+### Help Screen Integration (from Howard, 2026-02-25)
+- **Help overlay documents:** Full item list with types, rarities, stat mods, and slot assignments
+- **Help key:** Press `?` or `h` in-game to see item templates and inventory controls
+- **Inventory UI:** Interactive overlay (i key) shows equipped items (★), allows equip/unequip/use/drop actions
+- **No action needed:** Raj's item system is already complete; help screen displays existing templates and loot data

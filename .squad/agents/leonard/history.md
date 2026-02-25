@@ -35,3 +35,8 @@
 - **Game loop:** `AISystem.processAllMonsters()` called once per player turn from main.js game loop
 - **Status effects display:** HUD renders entity status effects from `entity.statusEffects[]` (no action needed on Leonard's side)
 - **Graceful degradation:** main.js guards `window.AISystem && AISystem.processAllMonsters()` — game runs without AI if script fails to load
+
+### Help Screen Integration (from Howard, 2026-02-25)
+- **Help overlay documents:** All 12 class abilities (power_strike, fireball, backstab, heal, etc.) with descriptions and resource costs
+- **Help key:** Press `?` or `h` in-game to see full ability list and combat controls
+- **No action needed:** Leonard's ability system is already complete; help screen displays existing data
