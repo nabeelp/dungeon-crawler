@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dungeon Crawler — Test Suite</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 24px;
+    }
+
+    h1 { font-size: 1.6em; margin-bottom: 4px; }
+    h2 { font-size: 1.15em; margin: 16px 0 6px; padding: 6px 10px; border-radius: 4px; }
+
+    .summary {
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .summary.pass { background: #0d3320; border-left: 5px solid #2ecc71; }
+    .summary.fail { background: #3d1111; border-left: 5px solid #e74c3c; }
+    .summary p { margin-top: 6px; font-size: 0.95em; }
+
+    .suite {
+      background: #16213e;
+      border-radius: 6px;
+      padding: 8px 12px 12px;
+      margin-bottom: 12px;
+    }
+
+    h2.pass { color: #2ecc71; }
+    h2.fail { color: #e74c3c; }
+
+    .test {
+      padding: 4px 12px;
+      font-size: 0.9em;
+      border-radius: 3px;
+      margin: 2px 0;
+    }
+    .test.pass { color: #a3d9a5; }
+    .test.fail { color: #f5a5a5; background: #2a1515; }
+
+    .error {
+      font-size: 0.82em;
+      color: #e74c3c;
+      margin: 2px 0 4px 20px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div id="test-results">
+    <p>Running tests…</p>
+  </div>
+
+  <!-- Core modules (order matters) -->
+  <script src="../src/core/constants.js"></script>
+  <script src="../src/core/utils.js"></script>
+  <script src="../src/core/gameState.js"></script>
+  <script src="../src/dungeon/generator.js"></script>
+
+  <!-- Test framework -->
+  <script src="test-runner.js"></script>
+
+  <!-- Test suites -->
+  <script src="test-utils.js"></script>
+  <script src="test-gamestate.js"></script>
+  <script src="test-dungeon.js"></script>
+
+  <!-- Run -->
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      TestRunner.run();
+    });
+  </script>
+</body>
+</html>

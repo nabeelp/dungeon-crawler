@@ -26,30 +26,42 @@
   <!-- Dungeon -->
   <script src="src/dungeon/generator.js"></script>
 
-  <!-- Future scripts loaded here by other team members -->
-  <!-- <script src="src/rendering/renderer.js"></script> -->
-  <!-- <script src="src/entities/player.js"></script> -->
-  <!-- <script src="src/entities/monsters.js"></script> -->
-  <!-- <script src="src/systems/combat.js"></script> -->
-  <!-- <script src="src/systems/fov.js"></script> -->
-  <!-- <script src="src/ui/hud.js"></script> -->
-  <!-- <script src="src/ui/inventory.js"></script> -->
-  <!-- <script src="src/main.js"></script> -->
+  <!-- Systems: FOV (no combat dependency) -->
+  <script src="src/systems/fov.js"></script>
+
+  <!-- Combat + AI (Leonard) -->
+  <script src="src/systems/combat.js"></script>
+  <script src="src/systems/ai.js"></script>
+
+  <!-- Entities (Leonard) -->
+  <script src="src/entities/monsters.js"></script>
+
+  <!-- Items (Raj) -->
+  <script src="src/items/items.js"></script>
+
+  <!-- Rendering (Howard) -->
+  <script src="src/rendering/renderer.js"></script>
+
+  <!-- UI (Howard) -->
+  <script src="src/ui/hud.js"></script>
+
+  <!-- Game loop — must be last (Howard) -->
+  <script src="src/main.js"></script>
 
   <script>
-    // Bootstrap: verify all modules loaded
+    // Bootstrap: verify all modules loaded and start game
     (function () {
-      const modules = ['Constants', 'Utils', 'GameState', 'DungeonGenerator'];
+      const modules = ['Constants', 'Utils', 'GameState', 'DungeonGenerator',
+                        'FOVSystem', 'CombatSystem', 'AISystem', 'MonsterFactory',
+                        'ItemSystem', 'Renderer', 'HUD', 'Game'];
       const missing = modules.filter(m => !window[m]);
       if (missing.length) {
         console.error('Missing modules:', missing.join(', '));
         return;
       }
-      console.log('All core modules loaded.');
-
-      // Quick smoke test: generate floor 1 and log stats
-      const testData = DungeonGenerator.generate(0, 42);
-      console.log(`Floor 1: ${testData.rooms.length} rooms, stairs down at (${testData.stairs.down.x}, ${testData.stairs.down.y})`);
+      console.log('All modules loaded.');
+      Game.init();
+      Game.start();
     })();
   </script>
 </body>
