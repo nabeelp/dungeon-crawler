@@ -72,6 +72,13 @@
       // AI / behaviour tag for monsters
       ai: opts.ai || null,
 
+      // Extra fields needed by combat/AI (survive save/load)
+      statusEffects: opts.statusEffects ? [...opts.statusEffects] : [],
+      tags:          opts.tags ? [...opts.tags] : [],
+      xpValue:       opts.xpValue ?? 0,
+      templateKey:   opts.templateKey || null,
+      _buffs:        opts._buffs ? [...opts._buffs] : [],
+
       // Is entity alive?
       alive: true
     };
@@ -84,7 +91,10 @@
    * @returns {object} item
    */
   function createItem(opts) {
-    return {
+    const STANDARD_KEYS = ['id','name','type','slot','description','rarity',
+      'floorLevel','identified','statMods','x','y','floor'];
+
+    const item = {
       id:          opts.id || Utils.generateId(),
       name:        opts.name || 'Unknown Item',
       type:        opts.type || 'potion',      // weapon | armor | potion | scroll | ring | food
@@ -102,6 +112,15 @@
       y: opts.y ?? null,
       floor: opts.floor ?? null
     };
+
+    // Preserve extra properties (e.g. _defKey, special) from opts
+    for (const key of Object.keys(opts)) {
+      if (!STANDARD_KEYS.includes(key) && !(key in item)) {
+        item[key] = opts[key];
+      }
+    }
+
+    return item;
   }
 
   // ── Game State Singleton ───────────────────────────────────

@@ -78,3 +78,9 @@
 - Priority: (1) Implement save/load state persistence for entity custom fields (statusEffects, tags, xpValue, _buffs, _enraged, _telegraphing, _summonedPhase), (2) Save/restore ItemSystem identification state, (3) Verify monster spawn failures don't occur with current room sizing
 - Blocking: Multiple systems (Leonard, Raj, Howard) depend on proper save/load
 - Architecture: Consider revisiting entity schema to include all persistent fields; may require gameState.js createEntity() or save() function enhancement
+
+### Bug #2 + Bug #6 Fixes (2026-02-26)
+
+- **Bug #2 — createItem() extra properties:** Added a loop at the end of `createItem()` that copies any `opts` keys not in the standard schema into the returned item. This preserves `_defKey` (potions/scrolls) and `special` (Flamebrand fire_dot). Also fixed `_generateEquipItem()` in items.js to pass `tmpl.special` to `createItem()`.
+- **Bug #6 — Entity schema expansion:** Added `statusEffects`, `tags`, `xpValue`, `templateKey`, and `_buffs` directly to the `createEntity()` return object. These were previously added ad-hoc by MonsterFactory/CombatSystem and would survive JSON serialization but weren't initialized as part of the schema, meaning loaded entities might lack them. Now they're always present with safe defaults.
+- **Bug #6 — ItemSystem identification state:** Added `getIdentificationState()` and `restoreIdentificationState()` to ItemSystem's public API. These serialize/deserialize `_idMap`, `_reverseIdMap`, and `_identifiedKeys`. Howard needs to wire these into `saveGame()`/`loadGame()` in main.js — decision doc written to `.squad/decisions/inbox/sheldon-createitem-saveload.md`.

@@ -355,7 +355,7 @@
     }
 
     const tmpl = rng.pick(candidates);
-    return GameState.createItem({
+    const itemOpts = {
       name:        tmpl.name,
       type:        type,
       slot:        tmpl.slot || _slotForType(type),
@@ -364,7 +364,9 @@
       identified:  true, // equipment is always identified
       statMods:    { ...tmpl.statMods },
       description: tmpl.description
-    });
+    };
+    if (tmpl.special) itemOpts.special = tmpl.special;
+    return GameState.createItem(itemOpts);
   }
 
   function _generatePotion(rarity, floorIndex, rng) {
@@ -728,10 +730,37 @@
     _initIdentificationMaps(rng);
   }
 
+  /**
+   * Serialize identification state for save games.
+   * @returns {object} state snapshot
+   */
+  function getIdentificationState() {
+    return {
+      idMap:          { potions: { ..._idMap.potions }, scrolls: { ..._idMap.scrolls } },
+      reverseIdMap:   { potions: { ..._reverseIdMap.potions }, scrolls: { ..._reverseIdMap.scrolls } },
+      identifiedKeys: [..._identifiedKeys]
+    };
+  }
+
+  /**
+   * Restore identification state from a save game.
+   * @param {object} saved - state snapshot from getIdentificationState()
+   */
+  function restoreIdentificationState(saved) {
+    if (!saved) return;
+    _idMap        = saved.idMap        || { potions: {}, scrolls: {} };
+    _reverseIdMap = saved.reverseIdMap || { potions: {}, scrolls: {} };
+    _identifiedKeys = new Set(saved.identifiedKeys || []);
+  }
+
   // ── Public API ──────────────────────────────────────────────
   window.ItemSystem = Object.freeze({
     // Initialization
     init,
+
+    // Identification state (save/load)
+    getIdentificationState,
+    restoreIdentificationState,
 
     // Loot generation
     generateLoot,
