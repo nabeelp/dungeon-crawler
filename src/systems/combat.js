@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const { MAP_WIDTH, MAP_HEIGHT, OPAQUE_TILES, XP_PER_LEVEL, REGEN_RATES, PHASES } = Constants;
+  const { MAP_WIDTH, MAP_HEIGHT, OPAQUE_TILES, XP_PER_LEVEL, REGEN_RATES, REGEN_COOLDOWN, PHASES } = Constants;
 
   // ── Status Effect Defaults ────────────────────────────────
   const STATUS_DEFAULTS = {
@@ -621,8 +621,8 @@
     if (!entity || !entity.alive) return;
     if (GameState.getPhase() !== PHASES.EXPLORING) return;
 
-    // Post-combat regen cooldown: only regen for 5 turns after combat ends
-    if (entity.regenCooldown === undefined) entity.regenCooldown = 5;
+    // Post-combat regen cooldown: only regen for N turns after combat ends (per-class)
+    if (entity.regenCooldown === undefined) entity.regenCooldown = (REGEN_COOLDOWN && REGEN_COOLDOWN[entity.classKey]) || 5;
     if (entity.regenCooldown <= 0) return;
     entity.regenCooldown--;
 

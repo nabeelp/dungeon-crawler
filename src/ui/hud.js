@@ -538,6 +538,7 @@
     helpLine('Each class passively regenerates resources per turn while exploring:');
     helpLine('Warrior: 2 HP, 3 stamina          Mage: 1 HP, 3 mana, 1 stamina', '#FF8844');
     helpLine('Rogue:   1 HP, 3 stamina          Cleric: 2 HP, 2 mana, 2 stamina', '#66FF66');
+    helpLine('Post-combat regen window: Warrior 5, Rogue 5, Cleric 7, Mage 8 turns');
     y += sectionGap;
 
     // GAME INFO

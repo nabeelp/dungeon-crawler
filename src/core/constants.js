@@ -150,6 +150,14 @@
     CLERIC:  Object.freeze({ hp: 2, mana: 2, stamina: 2 })
   });
 
+  // ── Per-Class Regen Cooldown (turns of regen after combat) ─
+  const REGEN_COOLDOWN = Object.freeze({
+    WARRIOR: 5,
+    MAGE:    8,
+    ROGUE:   5,
+    CLERIC:  7
+  });
+
   // ── Game Phases ─────────────────────────────────────────────
   const PHASES = Object.freeze({
     TITLE:     'title',
@@ -194,6 +202,7 @@
     ITEM_RARITIES,
     CLASSES,
     REGEN_RATES,
+    REGEN_COOLDOWN,
     PHASES,
     DIRECTIONS,
     XP_PER_LEVEL

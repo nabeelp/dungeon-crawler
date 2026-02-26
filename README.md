@@ -87,7 +87,16 @@ Each class passively regenerates HP, mana, and stamina at different rates per tu
 
 Regeneration never exceeds maximum values. A log message appears when resources are restored.
 
-**Post-Combat Cooldown:** Regeneration only lasts for 5 turns after combat ends, then stops. This prevents players from waiting indefinitely between fights to fully heal. Entering a new combat encounter resets the 5-turn regen window.
+**Post-Combat Cooldown:** Regeneration only lasts for a limited number of turns after combat ends, then stops. Each class has its own cooldown window:
+
+| Class | Regen Turns |
+|-------|-------------|
+| Warrior | 5 |
+| Rogue | 5 |
+| Cleric | 7 |
+| Mage | 8 |
+
+This prevents players from waiting indefinitely between fights to fully heal. Entering a new combat encounter resets the regen window. Mages and Clerics get longer windows to compensate for their heavier reliance on mana-based abilities.
 
 ### Combat
 Turn-based system with action resolution:

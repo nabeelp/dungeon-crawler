@@ -432,9 +432,9 @@
     const oldPhase = GameState.getPhase();
     const newPhase = inCombat ? PHASES.COMBAT : PHASES.EXPLORING;
 
-    // Reset regen cooldown when exiting combat
+    // Reset regen cooldown when exiting combat (per-class duration)
     if (oldPhase === PHASES.COMBAT && newPhase === PHASES.EXPLORING) {
-      player.regenCooldown = 5;
+      player.regenCooldown = (Constants.REGEN_COOLDOWN && Constants.REGEN_COOLDOWN[player.classKey]) || 5;
     }
 
     GameState.setPhase(newPhase);
