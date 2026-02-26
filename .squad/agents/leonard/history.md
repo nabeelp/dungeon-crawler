@@ -159,3 +159,199 @@
 - **Problem:** Dragon Lord's telegraphed melee attack (3x damage) used `CombatSystem.applyDamage()` directly, which sets `alive = false` but doesn't call `onKill()`. Kills skipped XP, loot, and death announcements.
 - **ai.js `behaviorBoss`:** Replaced the inline `GameState.addMessage` death message with `window.CombatSystem && CombatSystem.onKill && CombatSystem.onKill(entity, player)`, routing through the canonical kill handler.
 - **Note:** The AoE fire breath path already routed through `CombatSystem.aoeAttack()` which calls `onKill` internally — no change needed there.
+
+## Mana Recovery Analysis & Proposal (2026-02-27)
+
+### Problem Statement
+Nabeel identified that the 5-turn regen cooldown creates a mana deficit for the Mage class. Post-combat regen window only recovers 5 × 3 = 15 mana per encounter, but Mage maxMana is 120. If the Mage spends mana in combat, it can never fully recover between fights. But removing the cooldown entirely re-introduces the "wait-to-win" exploit Leslie flagged as the #1 fun-killer.
+
+### Current Implementation Analysis
+
+**Regen Cooldown Mechanics (combat.js:620-653, main.js:436-438):**
+- `regenCooldown` initialized to 5 on first use (or on COMBAT→EXPLORING transition)
+- Each EXPLORING turn: decrement cooldown, apply regen if cooldown > 0
+- Regen stops completely once cooldown hits 0
+- All resources (HP, mana, stamina) share the same 5-turn window
+
+**Mage Stats (constants.js:106-118):**
+- HP: 60, maxHP: 60
+- Mana: 120, maxMana: 120
+- Stamina: 60, maxStamina: 60
+- Attack: 6, Defense: 4 (lowest in game — glass cannon)
+
+**Mage Regen Rates (constants.js:148):**
+- HP: 1/turn, Mana: 3/turn, Stamina: 1/turn
+
+**Mage Ability Costs:**
+- Fireball: 30 mana (AoE, 2x damage)
+- Ice Shard: 15 mana (ranged, slow)
+- Arcane Shield: 25 mana (absorb 30 damage)
+
+### Math: Mana Economy Per Fight
+
+**Mana Recovery Per Encounter:**
+- 5 turns × 3 mana/turn = **15 mana recovered** per encounter
+
+**Mana Spent Per Fight (typical):**
+- Conservative fight: 1 Ice Shard (15) = 15 mana → Break even
+- Moderate fight: 1 Fireball (30) = 30 mana → Net loss of 15
+- Hard fight: 1 Fireball + 1 Ice Shard (45) = 45 mana → Net loss of 30
+- Defensive fight: 1 Arcane Shield + 1 Ice Shard (40) = 40 mana → Net loss of 25
+
+**Fights Until Empty (starting from 120 mana):**
+- Conservative (1 Ice Shard): 120 / 15 net = never empties (break-even)
+- Moderate (1 Fireball): 120 / 15 net loss = **8 fights** to empty
+- Hard (Fireball + Ice Shard): 120 / 30 net loss = **4 fights** to empty
+- Multi-spell hard: (2 Fireballs = 60 cost, 45 net loss) = **~3 fights** to empty
+
+**Turns to Full Recovery (if unlimited):**
+- Empty to full: 120 / 3 = **40 turns** of walking
+- But capped at 5 turns, so max recovery = 15 mana = **12.5% of pool**
+
+### Comparison: Other Class Resource Economies
+
+**Warrior (Stamina 100, regen 3/turn, 5 turns = 15 stamina):**
+- Power Strike: 20 stamina, Shield Bash: 15, War Cry: 25
+- Moderate fight (1 Power Strike): 20 cost, 15 recovery = 5 net loss
+- Fights to empty: 100 / 5 = **20 fights** — Warriors effectively never run out
+- Also: Warriors rely on free melee attacks primarily, abilities are supplemental
+
+**Rogue (Stamina 120, regen 3/turn, 5 turns = 15 stamina):**
+- Backstab: 20, Evade: 15, Poison Blade: 25
+- Moderate fight (1 Backstab): 20 cost, 15 recovery = 5 net loss
+- Fights to empty: 120 / 5 = **24 fights** — Rogues never run out either
+- Also: Rogues have strong melee (12 atk, crits), abilities are bonuses
+
+**Cleric (Mana 80, regen 2/turn, 5 turns = 10 mana):**
+- Heal: 30, Smite: 15, Divine Shield: 30
+- Moderate fight (1 Heal): 30 cost, 10 recovery = 20 net loss
+- Fights to empty: 80 / 20 = **4 fights** with healing every fight
+- BUT: Cleric also has 90 HP, 10 defense — less reliant on spells to survive
+
+**The Imbalance:**
+- Warrior/Rogue: Abilities are supplemental to strong free melee. 20+ fights before resource issues.
+- Cleric: Also drains fast, but has defensive stats (90 HP, 10 def) to fall back on.
+- Mage: Abilities ARE the class identity. 3-8 fights to empty. Has worst melee (6 atk, 4 def, 60 HP). When mana is gone, Mage is the weakest class in the game by far — even with Arcane Bolt (50% of an already bad base damage).
+
+### Option Analysis
+
+**Option A: Two-Tier Regen** — Full rate (3/turn) for 5 turns, then slow rate (1/turn) indefinitely. HP/stamina still cut off at 5 turns.
+- ✅ Simple to implement (add an else-branch in `regenerate()`)
+- ✅ Mana eventually recovers fully (120 turns walking = full from empty)
+- ⚠️ Partial wait-to-win concern: 1 mana/turn is slow enough that waiting 105 turns for the remaining 105 mana is tedious but possible
+- ✅ Doesn't affect HP/stamina balance — only mana gets the slow tail
+- ✅ Feels natural: "magical energy slowly seeps back"
+- **Wait-to-win risk: LOW.** 1 mana/turn is so slow that waiting 105 turns is genuinely boring. Players CAN do it but won't WANT to. Compare: current HP regen at 1/turn for Mage is already deemed acceptable over 5 turns.
+
+**Option B: Mana-Exempt Cooldown** — Mana always regenerates at full rate (3/turn), ignores cooldown. HP/stamina still respect cooldown.
+- ✅ Simple to implement (skip cooldown check for mana)
+- ❌ **Re-introduces wait-to-win for mana.** 120 / 3 = 40 turns = full mana every time. Player just waits 40 turns between every fight.
+- ❌ Leslie explicitly flagged this exact pattern. She'll reject it.
+- ✅ Feels class-distinctive
+- **Wait-to-win risk: HIGH.** This is exactly the exploit Leslie identified, just for one resource.
+
+**Option C: Meditation Mechanic** — Press M to skip turn, recover 5-8 mana.
+- ✅ Player agency — active choice, not passive
+- ⚠️ Still wait-to-win: Player just presses M 15-24 times between fights. Same problem with more keystrokes.
+- ⚠️ More complex to implement: new input handler, new action type, HUD changes, help screen update
+- ❌ Doesn't solve the core problem — it's just "wait but with extra steps"
+- **Wait-to-win risk: HIGH.** Meditation IS waiting. The cost (skip turn) is irrelevant when exploring safely.
+
+**Option D: Longer Cooldown for Mage** — 10 turns instead of 5. Same rate.
+- ✅ Simple to implement (per-class cooldown value)
+- ✅ Recovery doubles: 10 × 3 = 30 mana per encounter
+- ⚠️ Still only 25% of pool. Moderate fights still drain faster than recovery.
+- ⚠️ Means Mage also gets 10 turns of HP regen (10 HP) — unintended buff to survivability
+- ⚠️ Would need per-class cooldown values in constants.js, complicating the system
+- **Wait-to-win risk: NONE** (still hard-capped). But doesn't fully solve the problem.
+
+### Recommendation: Option A (Two-Tier Regen) — MANA ONLY
+
+**Implementation:**
+In `CombatSystem.regenerate()`, after the cooldown expires (cooldown ≤ 0), add a mana-only slow regen path at 1 mana/turn. HP and stamina regen remain hard-capped at 5 turns. No changes to constants.js needed — the slow rate (1/turn) can be hardcoded or added as a `PASSIVE_MANA_REGEN` constant.
+
+**Pseudocode change to `regenerate()` (combat.js:620-653):**
+```js
+function regenerate(entity) {
+  if (!entity || !entity.alive) return;
+  if (GameState.getPhase() !== PHASES.EXPLORING) return;
+
+  if (entity.regenCooldown === undefined) entity.regenCooldown = 5;
+
+  const rates = REGEN_RATES[entity.classKey];
+  if (!rates) return;
+
+  const parts = [];
+
+  if (entity.regenCooldown > 0) {
+    entity.regenCooldown--;
+    // Full regen window: all resources at full rate
+    if (rates.hp > 0 && entity.hp < entity.maxHp) {
+      const gain = Math.min(rates.hp, entity.maxHp - entity.hp);
+      entity.hp += gain;
+      parts.push(gain + ' HP');
+    }
+    if (rates.mana > 0 && entity.mana < entity.maxMana) {
+      const gain = Math.min(rates.mana, entity.maxMana - entity.mana);
+      entity.mana += gain;
+      parts.push(gain + ' mana');
+    }
+    if (rates.stamina > 0 && entity.stamina < entity.maxStamina) {
+      const gain = Math.min(rates.stamina, entity.maxStamina - entity.stamina);
+      entity.stamina += gain;
+      parts.push(gain + ' stamina');
+    }
+  } else {
+    // Passive mana-only regen (post-cooldown, slow rate)
+    if (rates.mana > 0 && entity.mana < entity.maxMana) {
+      const gain = Math.min(1, entity.maxMana - entity.mana);
+      entity.mana += gain;
+      parts.push(gain + ' mana');
+    }
+  }
+
+  if (parts.length > 0) {
+    GameState.addMessage('You regenerate ' + parts.join(', ') + '.', 'info');
+  }
+}
+```
+
+**Why Option A wins:**
+
+1. **Wait-to-win risk is LOW.** At 1 mana/turn, recovering 105 mana takes 105 turns of walking through already-explored dungeon. That's ~2 minutes of pressing arrow keys. Players CAN do it, but the tedium is the cost. Compare: in classic roguelikes, resting to heal works similarly — it costs time/food. We don't have food, but we have boredom as a natural deterrent. Leslie's original concern was about 60-turn full recovery at rate 3 — that's fast enough to be exploitable. Rate 1 is 3x slower and only affects mana.
+
+2. **Doesn't break other class balance.** Warrior/Rogue use stamina (no mana regen needed). Cleric gets slow mana regen too (at rate 1 instead of their normal 2) — fair, since Cleric has better stats to fall back on. The slow tail is a universal mana benefit, but it primarily helps the class that needs it most (Mage).
+
+3. **Simple to implement.** One else-branch in `regenerate()`. No new input handlers, no new constants, no per-class cooldown logic. ~10 lines changed.
+
+4. **Feels good as a player.** Mana slowly trickles back. You're not locked at 15 mana with a 120 mana pool and no way to recover. You still feel the pressure (it's slow), but you're not permanently crippled.
+
+5. **Recoverable math:** After a hard fight (45 mana spent, 15 recovered in cooldown = 30 net loss), the Mage needs 30 turns of walking to recover via passive. That's roughly 1-2 rooms of exploration — it paces naturally with dungeon traversal.
+
+### For Leslie's Review
+
+Key concern: Does this re-introduce wait-to-win?
+- At 1 mana/turn passive, full recovery from 0 takes 120 turns. That's tedious by design.
+- HP and stamina are still hard-capped at 5 turns — you can't wait-to-heal.
+- The only resource that slowly recovers is mana, and only at 1/3 the normal rate.
+- If Leslie considers even 1/turn too exploitable, we could reduce to 1 mana every 2 turns (0.5/turn effective). But I believe 1/turn hits the sweet spot.
+
+## Per-Class Regen Cooldowns — Option E (2026-02-27)
+
+### Implementation
+Leslie's proposal won: instead of a flat 5-turn cooldown for all classes, each class gets its own post-combat regen window. This gives mana-dependent classes (Mage, Cleric) more recovery time without changing regen rates or introducing new mechanics.
+
+### Changes Made
+- **constants.js:** Added `REGEN_COOLDOWN` frozen object: `{ WARRIOR: 5, MAGE: 8, ROGUE: 5, CLERIC: 7 }`. Exported on `window.Constants`.
+- **combat.js:** `regenerate()` initial assignment changed from hardcoded `5` to `(REGEN_COOLDOWN && REGEN_COOLDOWN[entity.classKey]) || 5`. Falls back to 5 for unknown classes.
+- **main.js:** `checkCombatPhase()` COMBAT→EXPLORING transition changed from `player.regenCooldown = 5` to `(Constants.REGEN_COOLDOWN && Constants.REGEN_COOLDOWN[player.classKey]) || 5`.
+- **hud.js:** Help screen REGENERATION section updated with per-class cooldown line.
+- **README.md:** Post-Combat Cooldown section updated with per-class table and rationale.
+
+### Balance Impact
+- **Warrior/Rogue (5 turns):** Unchanged — they rely on stamina which regens fast (3/turn, 15 total).
+- **Cleric (7 turns):** Gets 14 mana recovery (7 × 2) per encounter vs old 10 (5 × 2). +40% mana recovery.
+- **Mage (8 turns):** Gets 24 mana recovery (8 × 3) per encounter vs old 15 (5 × 3). +60% mana recovery. Still can't fully recover 120 mana pool, but significantly reduces the deficit.
+
+### Pre-existing Issue Noted
+The `regenCooldown` field is initialized to `0` in `createEntity()` (gameState.js:81), which means `regenerate()` skips the `=== undefined` branch and hits `<= 0` returning immediately. This affects new players who haven't exited combat yet. This is a pre-existing issue (Howard's save/load fix set default to 0), not introduced by this change.
