@@ -111,9 +111,7 @@
     }
 
     // Initialize combat and AI RNG for determinism
-    if (window.CombatSystem && CombatSystem.init) {
-      CombatSystem.init(Utils.createRNG(GameState.state.seed + 777));
-    }
+    CombatSystem.init(Utils.createRNG(GameState.state.seed + 777));
     if (window.AISystem && AISystem.init) {
       AISystem.init(Utils.createRNG(GameState.state.seed + 888));
     }
@@ -143,35 +141,31 @@
     if (!player || !player.alive) return;
 
     // Tick player status effects at start of turn (poison, bleed, buff expiry, stun)
-    if (window.CombatSystem && CombatSystem.processTurnStart) {
-      const canAct = CombatSystem.processTurnStart(player);
-      if (!canAct) {
-        // Player is stunned — skip action but still process the world
-        if (window.AISystem && AISystem.processAllMonsters) {
-          AISystem.processAllMonsters();
-        }
-        GameState.advanceTurn();
-        recomputeFOV();
-        checkCombatPhase();
-        if (window.ItemSystem && ItemSystem.tickBuffs) {
-          ItemSystem.tickBuffs(player);
-          const floorEntities = GameState.getEntitiesOnFloor(GameState.getCurrentFloor());
-          for (const ent of floorEntities) {
-            if (ent.type !== 'player' && ent.alive) {
-              ItemSystem.tickBuffs(ent);
-            }
+    const canAct = CombatSystem.processTurnStart(player);
+    if (!canAct) {
+      // Player is stunned — skip action but still process the world
+      if (window.AISystem && AISystem.processAllMonsters) {
+        AISystem.processAllMonsters();
+      }
+      GameState.advanceTurn();
+      recomputeFOV();
+      checkCombatPhase();
+      if (window.ItemSystem && ItemSystem.tickBuffs) {
+        ItemSystem.tickBuffs(player);
+        const floorEntities = GameState.getEntitiesOnFloor(GameState.getCurrentFloor());
+        for (const ent of floorEntities) {
+          if (ent.type !== 'player' && ent.alive) {
+            ItemSystem.tickBuffs(ent);
           }
         }
-        if (window.CombatSystem && CombatSystem.regenerate) {
-          CombatSystem.regenerate(player);
-        }
-        if (player.hp <= 0) {
-          player.alive = false;
-          handleDeath(player);
-        }
-        requestRender();
-        return;
       }
+      CombatSystem.regenerate(player);
+      if (player.hp <= 0) {
+        player.alive = false;
+        handleDeath(player);
+      }
+      requestRender();
+      return;
     }
 
     let acted = false;
@@ -214,9 +208,7 @@
       }
 
       // Class-based resource regeneration (exploring only)
-      if (window.CombatSystem && CombatSystem.regenerate) {
-        CombatSystem.regenerate(player);
-      }
+      CombatSystem.regenerate(player);
 
       // Check player death
       if (player.hp <= 0) {
@@ -244,9 +236,7 @@
     const target = GameState.getEntityAt(newX, newY, player.floor);
     if (target && target.type === 'monster' && target.alive) {
       // Attack the monster
-      if (window.CombatSystem && CombatSystem.meleeAttack) {
-        CombatSystem.meleeAttack(player, target);
-      }
+      CombatSystem.meleeAttack(player, target);
       return true;
     }
 
@@ -255,7 +245,7 @@
     player.y = newY;
 
     // Auto ranged attack (e.g., Mage Arcane Bolt) — scan move direction for enemies
-    if (window.CombatSystem && player.classKey) {
+    if (player.classKey) {
       const classDef = Constants.CLASSES[player.classKey];
       if (classDef && classDef.rangedAttack) {
         const range = classDef.rangedAttack.range;
@@ -391,40 +381,37 @@
   function tryAbility(player, index) {
     if (index < 0 || index >= player.abilities.length) return false;
 
-    if (window.CombatSystem && CombatSystem.useAbility) {
-      const abilityKey = player.abilities[index];
-      if (!abilityKey) return false;
+    const abilityKey = player.abilities[index];
+    if (!abilityKey) return false;
 
-      // Check if the ability is self-targeting (no enemy needed)
-      const abilityDef = CombatSystem.ABILITIES && CombatSystem.ABILITIES[abilityKey];
-      const isSelfTarget = abilityDef && (abilityDef.type === 'self' || abilityDef.type === 'party' || abilityDef.type === 'buff');
+    // Check if the ability is self-targeting (no enemy needed)
+    const abilityDef = CombatSystem.ABILITIES && CombatSystem.ABILITIES[abilityKey];
+    const isSelfTarget = abilityDef && (abilityDef.type === 'self' || abilityDef.type === 'party' || abilityDef.type === 'buff');
 
-      if (isSelfTarget) {
-        CombatSystem.useAbility(abilityKey, player, player);
-        return true;
-      }
+    if (isSelfTarget) {
+      CombatSystem.useAbility(abilityKey, player, player);
+      return true;
+    }
 
-      // Find nearest enemy as target for offensive abilities
-      const enemies = GameState.getEntitiesOnFloor(player.floor)
-        .filter(e => e.type === 'monster' && e.alive);
-      let nearest = null;
-      let nearestDist = Infinity;
-      for (const e of enemies) {
-        const d = Utils.chebyshevDist(player.x, player.y, e.x, e.y);
-        if (d < nearestDist) {
-          nearestDist = d;
-          nearest = e;
-        }
-      }
-      if (nearest && nearestDist <= FOV_RADIUS) {
-        CombatSystem.useAbility(abilityKey, player, nearest);
-        return true;
-      } else {
-        GameState.addMessage('No target in range.', 'combat');
-        return false;
+    // Find nearest enemy as target for offensive abilities
+    const enemies = GameState.getEntitiesOnFloor(player.floor)
+      .filter(e => e.type === 'monster' && e.alive);
+    let nearest = null;
+    let nearestDist = Infinity;
+    for (const e of enemies) {
+      const d = Utils.chebyshevDist(player.x, player.y, e.x, e.y);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = e;
       }
     }
-    return false;
+    if (nearest && nearestDist <= FOV_RADIUS) {
+      CombatSystem.useAbility(abilityKey, player, nearest);
+      return true;
+    } else {
+      GameState.addMessage('No target in range.', 'combat');
+      return false;
+    }
   }
 
   function checkCombatPhase() {
@@ -437,11 +424,8 @@
     let inCombat = false;
     for (const e of enemies) {
       if (visibleTiles.has(e.x + ',' + e.y)) {
-        const dist = Utils.chebyshevDist(player.x, player.y, e.x, e.y);
-        if (dist <= 2) {
-          inCombat = true;
-          break;
-        }
+        inCombat = true;
+        break;
       }
     }
 
@@ -566,9 +550,7 @@
       }
 
       // Re-initialize combat and AI RNG from seed
-      if (window.CombatSystem && CombatSystem.init) {
-        CombatSystem.init(Utils.createRNG(state.seed + 777));
-      }
+      CombatSystem.init(Utils.createRNG(state.seed + 777));
       if (window.AISystem && AISystem.init) {
         AISystem.init(Utils.createRNG(state.seed + 888));
       }
