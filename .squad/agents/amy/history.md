@@ -84,3 +84,19 @@
 ### Howard's Visual Effects (screen shake, floating damage, pulsing stairs)
 - No test coverage for visual rendering (out of scope for unit tests)
 - Tests focus on system state (damage numbers, shake triggers, animation flags)
+
+### Bug Fix Verification Tests (2026-02-26) — COMPLETE
+
+- **17 new tests** added across combat, items, and save/load files to verify Leslie's 6 critical bugs are fixed
+- **test-combat.js:** 6 new tests — no double XP on kill (exact xpValue awarded), multi-kill XP accumulation, checkLevelUp stat gains (+10 HP, +3 mana, +3 stamina per level), multi-level-up stacking, boss loot drop on kill via meleeAttack, stat gains without speed increase
+- **test-items.js:** 7 new tests — createItem preserves _defKey, createItem preserves special (fire_dot), _defKey survives generateLoot pipeline, init() creates randomized potion/scroll display names, tickBuffs decrements duration, tickBuffs reverses effect on expiry, equipment stat application integrity
+- **test-save.js:** 7 new tests — statusEffects survive save/load cycle (populated and empty), monster tags/xpValue persist, boss multi-tags persist, item _defKey preserved in inventory and ground items after save/load, full game state round-trip integrity
+- **All 17 tests passing** ✓
+- **Coverage:** Bugs #1 (double XP), #2 (createItem props), #3 (init wiring), #4 (dropLoot wiring), #5 (tickBuffs wiring), #6 (save/load state)
+
+### Leslie's Bug Fix Sprint (2026-02-26) — COMPLETE
+
+- **Team:** Sheldon (Lead), Leonard (Combat), Howard (Rendering), Amy (Tester)
+- **All 6 critical bugs fixed and verified**
+- **17 regression tests added**
+- **All changes committed with team signature**

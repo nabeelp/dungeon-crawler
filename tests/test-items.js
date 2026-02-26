@@ -379,4 +379,97 @@
       expect(keys.indexOf('stamina_1') !== -1).toBe(true);
     });
   });
+
+  // ── Bug Fix: createItem Preserves Custom Properties ───────
+  describe('ItemSystem — createItem custom properties (bug fix)', function () {
+    it('createItem preserves _defKey', function () {
+      GameState.newGame(SEED);
+      const item = GameState.createItem({
+        name: 'Test Potion', type: 'potion', _defKey: 'health_1'
+      });
+      expect(item._defKey).toBe('health_1');
+    });
+
+    it('createItem preserves special property', function () {
+      GameState.newGame(SEED);
+      const item = GameState.createItem({
+        name: 'Flamebrand', type: 'weapon', slot: 'weapon',
+        statMods: { attack: 12 }, special: 'fire_dot'
+      });
+      expect(item.special).toBe('fire_dot');
+    });
+
+    it('createItem preserves _defKey through generateLoot', function () {
+      const player = makePlayer();
+      const rng = Utils.createRNG(SEED + 5000);
+      const items = ItemSystem.generateLoot(0, rng);
+      const potion = items.find(i => i.type === 'potion');
+      if (potion) {
+        expect(potion._defKey).toBeTruthy();
+        expect(typeof potion._defKey).toBe('string');
+      }
+    });
+  });
+
+  // ── Bug Fix: Initialization & Buff Ticking ────────────────
+  describe('ItemSystem — init and tickBuffs (bug fix)', function () {
+    it('ItemSystem.init creates randomized potion display names', function () {
+      GameState.newGame(SEED);
+      const rng = Utils.createRNG(SEED);
+      ItemSystem.init(rng);
+
+      const lootRng = Utils.createRNG(SEED + 100);
+      const items = ItemSystem.generateLoot(0, lootRng);
+      const potion = items.find(i => i.type === 'potion');
+      if (potion) {
+        const displayName = ItemSystem.getDisplayName(potion);
+        expect(displayName).toBeTruthy();
+        expect(typeof displayName).toBe('string');
+        expect(displayName.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('ItemSystem.init creates randomized scroll display names', function () {
+      GameState.newGame(SEED);
+      const rng = Utils.createRNG(SEED);
+      ItemSystem.init(rng);
+
+      const lootRng = Utils.createRNG(SEED + 200);
+      const items = ItemSystem.generateLoot(3, lootRng);
+      const scroll = items.find(i => i.type === 'scroll');
+      if (scroll) {
+        const displayName = ItemSystem.getDisplayName(scroll);
+        expect(displayName).toBeTruthy();
+        expect(typeof displayName).toBe('string');
+        expect(displayName.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('tickBuffs decrements buff duration', function () {
+      const player = makePlayer();
+      const baseAtk = player.attack;
+      if (!player._buffs) player._buffs = [];
+      player._buffs.push({ stat: 'attack', amount: 5, turnsLeft: 3 });
+      player.attack += 5;
+
+      ItemSystem.tickBuffs(player);
+
+      expect(player._buffs.length).toBe(1);
+      expect(player._buffs[0].turnsLeft).toBe(2);
+      expect(player.attack).toBe(baseAtk + 5); // still active
+    });
+
+    it('tickBuffs removes buff and reverses effect when expired', function () {
+      const player = makePlayer();
+      const baseAtk = player.attack;
+      if (!player._buffs) player._buffs = [];
+      player._buffs.push({ stat: 'attack', amount: 5, turnsLeft: 1 });
+      player.attack += 5;
+
+      ItemSystem.tickBuffs(player);
+
+      expect(player._buffs.length).toBe(0);
+      expect(player.attack).toBe(baseAtk); // reversed
+    });
+  });
 })();

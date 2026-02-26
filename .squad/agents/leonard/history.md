@@ -103,3 +103,17 @@
 ### Integration Notes for Leonard
 - Priority: (1) Fix double XP/level-up by removing award from main.js, (2) Wire ItemSystem.dropLoot() in onKill(), (3) Add ItemSystem.tickBuffs() call per turn, (4) Save/restore buff state
 - Next: Replace Math.random() with seeded RNG where possible; expand combat phase threshold; add allegiance filtering for AoE
+
+### Bug Fixes (2026-02-26)
+- **Double XP fix (Bug #1):** Made `CombatSystem.onKill()` and `CombatSystem.checkLevelUp()` the canonical XP/level-up path. Both are now exported on `window.CombatSystem`. Howard removed the duplicate XP award and `checkLevelUp()` from `main.js`.
+- **checkLevelUp stat gains updated:** Changed from +8 HP/+4 mana/+4 stamina/+2 atk/+1 def/+1 spd to +10 HP (partial heal)/+3 mana/+3 stamina/+1 atk/+1 def. Removed speed gain — speed should come from equipment, not levels.
+- **dropLoot wired (Bug #4):** `onKill()` now calls `ItemSystem.dropLoot(victim, victim.floor)` with `window.ItemSystem &&` guard. `dropLoot` handles `addGroundItem()` and loot messages internally — no extra work needed in combat.js.
+- **onKill exported:** Added `onKill` to `CombatSystem` public API so main.js can call it from the fallback path if needed.
+
+### Leslie's Bug Fix Sprint (2026-02-26) — COMPLETE
+
+- **Team:** Sheldon (Lead), Leonard (Combat), Howard (Rendering), Amy (Tester)
+- **Scope:** All 6 critical bugs resolved
+- **Bugs fixed:** Double XP (Leonard), createItem props (Sheldon), ItemSystem.init wiring (Howard), dropLoot wiring (Leonard), tickBuffs wiring (Howard), save/load state (Sheldon + Howard)
+- **Test coverage:** 17 new regression tests (6 combat, 7 items, 7 save/load) — all passing
+- **Decision docs:** All inbox files merged into decisions.md; orchestration logs created

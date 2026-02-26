@@ -91,3 +91,11 @@
 - **Bug #3 — ItemSystem.init() wired:** Added `ItemSystem.init(idRng)` call in `startNewGame()` after `GameState.newGame()` and before monster/item spawning. Uses seed offset +999 to avoid colliding with other RNG streams.
 - **Bug #5 — tickBuffs() wired per turn:** Added `ItemSystem.tickBuffs()` calls in `processPlayerAction()` after enemy turns. Ticks player first, then all alive non-player entities on the current floor. Placed before regeneration to ensure buff expiry happens before regen.
 - **Bug #6 — Save/Load identification state:** Added `identificationState` field to save data (via `ItemSystem.getIdentificationState()` guard). On load, restores via `ItemSystem.restoreIdentificationState()` guard. Both use defensive `window.ItemSystem && method` checks so they degrade gracefully if Sheldon's API additions aren't merged yet.
+
+### Leslie's Bug Fix Sprint (2026-02-26) — COMPLETE
+
+- **Team:** Sheldon (Lead), Leonard (Combat), Howard (Rendering), Amy (Tester)
+- **Scope:** All 6 critical bugs resolved
+- **Bugs fixed:** Double XP (removed), createItem props (schema expanded), ItemSystem.init (wired), dropLoot (wired), tickBuffs (wired), save/load state (identification + entity fields preserved)
+- **Test coverage:** 17 new regression tests — all passing
+- **All .squad changes committed** with team signature

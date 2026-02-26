@@ -293,6 +293,11 @@
       GameState.addMessage(`+${victim.xpValue} XP`, 'system');
       checkLevelUp(killer);
     }
+
+    // Drop loot at the dead monster's position
+    if (window.ItemSystem && ItemSystem.dropLoot) {
+      ItemSystem.dropLoot(victim, victim.floor);
+    }
   }
 
   function checkLevelUp(entity) {
@@ -301,16 +306,15 @@
       if (entity.xp < needed) break;
       entity.xp -= needed;
       entity.level++;
-      // Stat increases
-      entity.maxHp += 8;
-      entity.hp = Math.min(entity.hp + 8, entity.maxHp);
-      entity.maxMana += 4;
-      entity.mana = Math.min(entity.mana + 4, entity.maxMana);
-      entity.maxStamina += 4;
-      entity.stamina = Math.min(entity.stamina + 4, entity.maxStamina);
-      entity.attack += 2;
+      // Stat increases: +10 HP (partial heal), +3 mana, +3 stamina, +1 atk, +1 def
+      entity.maxHp += 10;
+      entity.hp = Math.min(entity.hp + 10, entity.maxHp);
+      entity.maxMana += 3;
+      entity.mana = Math.min(entity.mana + 3, entity.maxMana);
+      entity.maxStamina += 3;
+      entity.stamina = Math.min(entity.stamina + 3, entity.maxStamina);
+      entity.attack += 1;
       entity.defense += 1;
-      entity.speed += 1;
       GameState.addMessage(`${entity.name} reaches level ${entity.level}!`, 'system');
     }
   }
@@ -631,6 +635,7 @@
     processTurnStart,
 
     // XP / leveling
+    onKill,
     checkLevelUp,
 
     // Regeneration

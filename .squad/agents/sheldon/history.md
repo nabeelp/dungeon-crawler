@@ -83,4 +83,11 @@
 
 - **Bug #2 — createItem() extra properties:** Added a loop at the end of `createItem()` that copies any `opts` keys not in the standard schema into the returned item. This preserves `_defKey` (potions/scrolls) and `special` (Flamebrand fire_dot). Also fixed `_generateEquipItem()` in items.js to pass `tmpl.special` to `createItem()`.
 - **Bug #6 — Entity schema expansion:** Added `statusEffects`, `tags`, `xpValue`, `templateKey`, and `_buffs` directly to the `createEntity()` return object. These were previously added ad-hoc by MonsterFactory/CombatSystem and would survive JSON serialization but weren't initialized as part of the schema, meaning loaded entities might lack them. Now they're always present with safe defaults.
-- **Bug #6 — ItemSystem identification state:** Added `getIdentificationState()` and `restoreIdentificationState()` to ItemSystem's public API. These serialize/deserialize `_idMap`, `_reverseIdMap`, and `_identifiedKeys`. Howard needs to wire these into `saveGame()`/`loadGame()` in main.js — decision doc written to `.squad/decisions/inbox/sheldon-createitem-saveload.md`.
+- **Bug #6 — ItemSystem identification state:** Added `getIdentificationState()` and `restoreIdentificationState()` to ItemSystem's public API. These serialize/deserialize `_idMap`, `_reverseIdMap`, and `_identifiedKeys`. Howard wired these into `saveGame()`/`loadGame()` in main.js with defensive guards.
+
+### Leslie's Bug Fix Sprint (2026-02-26) — COMPLETE
+
+- **Team:** Sheldon (Lead), Leonard (Combat), Howard (Rendering), Amy (Tester)
+- **Scope:** All 6 critical bugs resolved
+- **Test coverage:** 17 new regression tests added across combat, items, save/load
+- **Status:** All tests passing; decision docs merged into decisions.md

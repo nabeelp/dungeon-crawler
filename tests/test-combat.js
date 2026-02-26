@@ -397,4 +397,91 @@
       expect(monster.hp).toBe(50);
     });
   });
+
+  // ── Bug Fix: No Double XP on Kill ─────────────────────────
+  describe('CombatSystem — XP award on kill (bug fix)', function () {
+    it('meleeAttack awards exactly victim.xpValue XP on kill', function () {
+      const player = makePlayer();
+      player.xp = 0;
+      const monster = makeMonster({ hp: 1, maxHp: 1, defense: 0 });
+      monster.xpValue = 25;
+
+      CombatSystem.meleeAttack(player, monster);
+
+      expect(monster.alive).toBe(false);
+      expect(player.xp).toBe(25);
+    });
+
+    it('killing multiple monsters accumulates XP correctly', function () {
+      const player = makePlayer();
+      player.xp = 0;
+      const m1 = makeMonster({ hp: 1, maxHp: 1, defense: 0, x: 6, y: 5 });
+      m1.xpValue = 10;
+      const m2 = makeMonster({ hp: 1, maxHp: 1, defense: 0, x: 4, y: 5 });
+      m2.xpValue = 15;
+
+      CombatSystem.meleeAttack(player, m1);
+      CombatSystem.meleeAttack(player, m2);
+
+      expect(player.xp).toBe(25);
+    });
+  });
+
+  // ── Bug Fix: Level-Up Stat Gains ──────────────────────────
+  describe('CombatSystem — checkLevelUp stat gains (bug fix)', function () {
+    it('level up grants +10 maxHP, +3 maxMana, +3 maxStamina', function () {
+      const player = makePlayer();
+      const baseMaxHp = player.maxHp;
+      const baseMaxMana = player.maxMana;
+      const baseMaxStamina = player.maxStamina;
+
+      player.xp = 50; // level 1 needs 50 XP
+      CombatSystem.checkLevelUp(player);
+
+      expect(player.level).toBe(2);
+      expect(player.maxHp).toBe(baseMaxHp + 10);
+      expect(player.maxMana).toBe(baseMaxMana + 3);
+      expect(player.maxStamina).toBe(baseMaxStamina + 3);
+    });
+
+    it('multiple level-ups stack stat gains correctly', function () {
+      const player = makePlayer();
+      const baseMaxHp = player.maxHp;
+      const baseMaxMana = player.maxMana;
+
+      // Give enough XP for 2 level-ups (50 + 62 = 112)
+      player.xp = 200;
+      CombatSystem.checkLevelUp(player);
+
+      expect(player.level).toBeGreaterThan(2);
+      // Each level: +10 maxHP, +3 maxMana
+      const levelsGained = player.level - 1;
+      expect(player.maxHp).toBe(baseMaxHp + levelsGained * 10);
+      expect(player.maxMana).toBe(baseMaxMana + levelsGained * 3);
+    });
+  });
+
+  // ── Bug Fix: Loot Drop on Kill ────────────────────────────
+  describe('CombatSystem — loot drop on kill (bug fix)', function () {
+    it('killing a boss monster places loot at its position', function () {
+      const player = makePlayer();
+      setupFloor();
+      if (window.ItemSystem && ItemSystem.init) {
+        ItemSystem.init(Utils.createRNG(42));
+      }
+      const monster = makeMonster({ hp: 1, maxHp: 1, defense: 0 });
+      monster.xpValue = 50;
+      monster.tags = ['boss'];
+
+      const groundBefore = GameState.getGroundItemsAt(monster.x, monster.y, 0).length;
+
+      CombatSystem.meleeAttack(player, monster);
+
+      expect(monster.alive).toBe(false);
+      if (window.ItemSystem) {
+        const groundAfter = GameState.getGroundItemsAt(monster.x, monster.y, 0);
+        expect(groundAfter.length).toBeGreaterThan(groundBefore);
+      }
+    });
+  });
 })();

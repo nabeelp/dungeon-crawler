@@ -344,4 +344,141 @@
       cleanup();
     });
   });
+
+  // ── Bug Fix: Entity State Preservation ────────────────────
+  describe('Save/Load — statusEffects preservation (bug fix)', function () {
+    it('save preserves player statusEffects', function () {
+      cleanup();
+      const player = setupGame();
+      player.statusEffects = [
+        { type: 'poisoned', duration: 3, damage: 5 },
+        { type: 'buffed', duration: 2, stat: 'attack', amount: 7 }
+      ];
+      saveGame();
+
+      GameState.newGame(999);
+      loadGame();
+
+      const loaded = GameState.state.player;
+      expect(loaded.statusEffects).toBeTruthy();
+      expect(loaded.statusEffects.length).toBe(2);
+      expect(loaded.statusEffects[0].type).toBe('poisoned');
+      expect(loaded.statusEffects[0].damage).toBe(5);
+      expect(loaded.statusEffects[1].type).toBe('buffed');
+      expect(loaded.statusEffects[1].amount).toBe(7);
+      cleanup();
+    });
+
+    it('save preserves empty statusEffects array', function () {
+      cleanup();
+      const player = setupGame();
+      player.statusEffects = [];
+      saveGame();
+
+      GameState.newGame(999);
+      loadGame();
+
+      const loaded = GameState.state.player;
+      expect(loaded.statusEffects).toBeTruthy();
+      expect(loaded.statusEffects.length).toBe(0);
+      cleanup();
+    });
+  });
+
+  describe('Save/Load — entity tags preservation (bug fix)', function () {
+    it('save preserves monster tags', function () {
+      cleanup();
+      setupGame();
+      const monster = GameState.createEntity({
+        name: 'Skeleton', type: 'monster',
+        x: 10, y: 10, floor: 0,
+        hp: 30, maxHp: 30, attack: 5, defense: 3, speed: 6
+      });
+      monster.tags = ['undead'];
+      monster.statusEffects = [];
+      monster.xpValue = 20;
+      GameState.addEntity(monster);
+      saveGame();
+
+      GameState.newGame(999);
+      loadGame();
+
+      const entities = GameState.state.entities;
+      const loadedMonster = entities.find(e => e.name === 'Skeleton');
+      expect(loadedMonster).toBeTruthy();
+      expect(loadedMonster.tags).toBeTruthy();
+      expect(loadedMonster.tags.length).toBe(1);
+      expect(loadedMonster.tags[0]).toBe('undead');
+      expect(loadedMonster.xpValue).toBe(20);
+      cleanup();
+    });
+
+    it('save preserves boss tags', function () {
+      cleanup();
+      setupGame();
+      const boss = GameState.createEntity({
+        name: 'Dragon Lord', type: 'monster',
+        x: 20, y: 20, floor: 0,
+        hp: 500, maxHp: 500, attack: 25, defense: 15, speed: 10
+      });
+      boss.tags = ['boss', 'dragon'];
+      boss.statusEffects = [];
+      boss.xpValue = 200;
+      GameState.addEntity(boss);
+      saveGame();
+
+      GameState.newGame(999);
+      loadGame();
+
+      const loaded = GameState.state.entities.find(e => e.name === 'Dragon Lord');
+      expect(loaded).toBeTruthy();
+      expect(loaded.tags).toContain('boss');
+      expect(loaded.tags).toContain('dragon');
+      expect(loaded.xpValue).toBe(200);
+      cleanup();
+    });
+  });
+
+  describe('Save/Load — identification state (bug fix)', function () {
+    it('save preserves item _defKey in inventory', function () {
+      cleanup();
+      const player = setupGame();
+      const potion = GameState.createItem({
+        name: 'Bubbling Potion', type: 'potion',
+        _defKey: 'health_1', identified: false
+      });
+      player.inventory.push(potion);
+      saveGame();
+
+      GameState.newGame(999);
+      loadGame();
+
+      const loaded = GameState.state.player;
+      const loadedPotion = loaded.inventory.find(function (i) { return i.type === 'potion'; });
+      expect(loadedPotion).toBeTruthy();
+      expect(loadedPotion._defKey).toBe('health_1');
+      cleanup();
+    });
+
+    it('save preserves item _defKey in ground items', function () {
+      cleanup();
+      setupGame();
+      const scroll = GameState.createItem({
+        name: 'Dusty Scroll', type: 'scroll',
+        _defKey: 'fireball', identified: false,
+        x: 3, y: 3, floor: 0
+      });
+      GameState.addGroundItem(scroll);
+      saveGame();
+
+      GameState.newGame(999);
+      loadGame();
+
+      const groundItems = GameState.state.groundItems;
+      const loadedScroll = groundItems.find(function (i) { return i.type === 'scroll'; });
+      expect(loadedScroll).toBeTruthy();
+      expect(loadedScroll._defKey).toBe('fireball');
+      cleanup();
+    });
+  });
 })();

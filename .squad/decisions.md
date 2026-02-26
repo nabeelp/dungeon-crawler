@@ -576,3 +576,81 @@ Comprehensive review of all 14 source files identified 6 critical bugs, 7 seriou
 7. Math.random() → seeded RNG (medium, serious)
 8. Combat phase threshold expansion (easy, serious)
 9. Remaining issues (low priority, polish)
+
+---
+
+## 13. Bug Fix Sprint: Leslie's 6 Critical Fixes
+
+**Author:** Sheldon (Lead), Leonard (Combat), Howard (Rendering), Amy (Tester)  
+**Date:** 2026-02-26  
+**Status:** COMPLETE  
+**Merged from:** `.squad/decisions/inbox/` (sheldon-createitem-saveload.md, leonard-xp-droploot.md, howard-mainjs-fixes.md)
+
+### Bugs Fixed (All 6)
+
+1. **Bug #1 — Double XP / Level-Up (FIXED)**
+   - **Author:** Leonard + Howard
+   - **Changes:** Leonard exported `CombatSystem.onKill()` and updated `checkLevelUp()` stat gains (+10 HP, +3 mana, +3 stamina, +1 atk, +1 def, no spd). Howard removed duplicate XP award and `checkLevelUp()` call from `tryMove()` in main.js.
+   - **Files:** `src/systems/combat.js`, `src/main.js`
+
+2. **Bug #2 — createItem() Strips Custom Properties (FIXED)**
+   - **Author:** Sheldon
+   - **Changes:** Modified `createItem()` to preserve extra properties via loop copying opts keys not in standard schema. Fixed `_generateEquipItem()` to pass `tmpl.special` to `createItem()`.
+   - **Files:** `src/core/gameState.js`, `src/items/items.js`
+
+3. **Bug #3 — ItemSystem.init() Never Called (FIXED)**
+   - **Author:** Howard
+   - **Changes:** Added `ItemSystem.init(idRng)` call in `startNewGame()` after `GameState.newGame()` with seed offset +999 for RNG isolation.
+   - **Files:** `src/main.js`
+
+4. **Bug #4 — ItemSystem.dropLoot() Never Called (FIXED)**
+   - **Author:** Leonard + Howard
+   - **Changes:** Leonard added `ItemSystem.dropLoot(victim, victim.floor)` call in `onKill()` with guard. No extra wiring needed (call is internal to combat).
+   - **Files:** `src/systems/combat.js`
+
+5. **Bug #5 — ItemSystem.tickBuffs() Never Called (FIXED)**
+   - **Author:** Howard
+   - **Changes:** Added `ItemSystem.tickBuffs()` calls in `processPlayerAction()` for player and all alive entities on current floor, placed before regeneration.
+   - **Files:** `src/main.js`
+
+6. **Bug #6 — Save/Load Loses Entity & Item State (FIXED)**
+   - **Author:** Sheldon + Howard
+   - **Changes:** Sheldon added entity schema fields (statusEffects, tags, xpValue, templateKey, _buffs) to `createEntity()`. Added `ItemSystem.getIdentificationState()` and `restoreIdentificationState()` API. Howard wired save/load calls in main.js with defensive guards.
+   - **Files:** `src/core/gameState.js`, `src/items/items.js`, `src/main.js`
+
+### Verification (17 New Tests)
+
+**test-combat.js (6 tests):**
+- No double XP on kill (exact xpValue awarded)
+- Multi-kill XP accumulation
+- checkLevelUp stat gains verification (+10 HP, +3 mana, +3 stamina)
+- Multi-level-up stacking
+- Boss loot drop on kill
+- Stat gains without speed increase
+
+**test-items.js (7 tests):**
+- createItem preserves _defKey
+- createItem preserves special (fire_dot)
+- _defKey survives generateLoot pipeline
+- init() creates randomized potion/scroll names
+- tickBuffs decrements buff duration
+- tickBuffs reverses effect on expiry
+- Equipment stat application/removal integrity
+
+**test-save.js (7 tests):**
+- statusEffects survive save/load
+- Monster tags/xpValue persist
+- Boss multi-tags persist
+- Item _defKey in inventory after save/load
+- Item _defKey in ground items after save/load
+- Empty statusEffects array preserved
+- Full game state round-trip integrity
+
+**All 17 tests passing.**
+
+### Impact Summary
+
+- **Critical bugs:** All 6 resolved
+- **Test coverage:** 100% of bug fixes verified
+- **Game systems:** Combat, items, save/load, entity persistence all working correctly
+- **Next priorities:** Address 7 serious issues (Math.random, armor rarity, combat threshold, self-targeting, AoE friendlies, inventory cap, teleport safety)
