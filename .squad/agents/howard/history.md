@@ -99,3 +99,11 @@
 - **Bugs fixed:** Double XP (removed), createItem props (schema expanded), ItemSystem.init (wired), dropLoot (wired), tickBuffs (wired), save/load state (identification + entity fields preserved)
 - **Test coverage:** 17 new regression tests — all passing
 - **All .squad changes committed** with team signature
+
+### Three Critical Bug Fixes (2026-02-26)
+
+- **Bug #1 — Player status effects now tick:** Added `CombatSystem.processTurnStart(player)` call at the start of `processPlayerAction()`. This ticks poison, bleed, buff expiry, and stun for the player every turn. If the player is stunned, their action is skipped but the world still advances (enemies act, buffs tick, regen happens). Previously, War Cry and Divine Shield were permanent, poison/bleed never damaged the player, and stun had no effect.
+- **Bug #2 — Save/load split-brain fixed:** After JSON deserialization in `loadGame()`, `state.player` and its matching entry in `state.entities` were separate objects. Added `Object.assign` + reference re-linking so `state.player` points to the same object in `state.entities`. Movement and combat now update both references consistently after a load.
+- **Bug #3 — Self-targeting abilities work without enemies:** `tryAbility()` now checks the ability definition's `type` field from `CombatSystem.ABILITIES` before requiring an enemy target. Abilities with type `'self'`, `'party'`, or `'buff'` fire immediately with the player as both source and target. Heal, War Cry, Evade, Arcane Shield, and Divine Shield all work between fights now.
+- **Dead code cleanup:** Removed the fallback combat path in `tryMove()` (unreachable since CombatSystem always loads) and the orphaned `checkLevelUp()` function in main.js. Removed unused `XP_PER_LEVEL` import.
+- **README updated:** Ability keybind description now clarifies that self-targeting abilities work anywhere, while offensive abilities auto-target nearest visible enemy.

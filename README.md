@@ -36,7 +36,7 @@ python -m http.server 8000
 | **Ascend Stairs** | `<` or `,` (while standing on silver stairs) |
 | **Pick Up Items** | `G` |
 | **Wait / Skip Turn** | Spacebar or `5` |
-| **Cast Ability** | `1` – `3` (auto-targets nearest visible enemy) |
+| **Cast Ability** | `1` – `3` (self-targeting abilities work anywhere; offensive abilities auto-target nearest visible enemy) |
 | **Open Inventory** | `I` |
 | **Inventory Navigation** | Arrow Keys (↑ ↓) |
 | **Equip / Unequip** | `E` (in inventory) |

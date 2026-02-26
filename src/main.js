@@ -11,7 +11,7 @@
   'use strict';
 
   const { TILES, TILE_SIZE, MAP_WIDTH, MAP_HEIGHT, MAX_FLOORS, FOV_RADIUS,
-          PHASES, CLASSES, WALKABLE_TILES, XP_PER_LEVEL } = Constants;
+          PHASES, CLASSES, WALKABLE_TILES } = Constants;
 
   let canvas = null;
   let visibleTiles = new Set();
@@ -134,6 +134,38 @@
     const player = GameState.getPlayer();
     if (!player || !player.alive) return;
 
+    // Tick player status effects at start of turn (poison, bleed, buff expiry, stun)
+    if (window.CombatSystem && CombatSystem.processTurnStart) {
+      const canAct = CombatSystem.processTurnStart(player);
+      if (!canAct) {
+        // Player is stunned — skip action but still process the world
+        if (window.AISystem && AISystem.processAllMonsters) {
+          AISystem.processAllMonsters();
+        }
+        GameState.advanceTurn();
+        recomputeFOV();
+        checkCombatPhase();
+        if (window.ItemSystem && ItemSystem.tickBuffs) {
+          ItemSystem.tickBuffs(player);
+          const floorEntities = GameState.getEntitiesOnFloor(GameState.getCurrentFloor());
+          for (const ent of floorEntities) {
+            if (ent.type !== 'player' && ent.alive) {
+              ItemSystem.tickBuffs(ent);
+            }
+          }
+        }
+        if (window.CombatSystem && CombatSystem.regenerate) {
+          CombatSystem.regenerate(player);
+        }
+        if (player.hp <= 0) {
+          player.alive = false;
+          handleDeath(player);
+        }
+        requestRender();
+        return;
+      }
+    }
+
     let acted = false;
 
     if (action.type === 'move') {
@@ -206,18 +238,6 @@
       // Attack the monster
       if (window.CombatSystem && CombatSystem.meleeAttack) {
         CombatSystem.meleeAttack(player, target);
-        // XP and level-up handled by CombatSystem.onKill()
-      } else {
-        // Fallback: simple damage
-        const dmg = Math.max(1, player.attack - target.defense);
-        target.hp -= dmg;
-        GameState.addMessage('You hit ' + target.name + ' for ' + dmg + ' damage!', 'combat');
-        if (target.hp <= 0) {
-          target.alive = false;
-          GameState.addMessage(target.name + ' is defeated!', 'combat');
-          player.xp += (target.level || 1) * 10;
-          checkLevelUp(player);
-        }
       }
       return true;
     }
@@ -348,7 +368,16 @@
       const abilityKey = player.abilities[index];
       if (!abilityKey) return false;
 
-      // Find nearest enemy as target
+      // Check if the ability is self-targeting (no enemy needed)
+      const abilityDef = CombatSystem.ABILITIES && CombatSystem.ABILITIES[abilityKey];
+      const isSelfTarget = abilityDef && (abilityDef.type === 'self' || abilityDef.type === 'party' || abilityDef.type === 'buff');
+
+      if (isSelfTarget) {
+        CombatSystem.useAbility(abilityKey, player, player);
+        return true;
+      }
+
+      // Find nearest enemy as target for offensive abilities
       const enemies = GameState.getEntitiesOnFloor(player.floor)
         .filter(e => e.type === 'monster' && e.alive);
       let nearest = null;
@@ -390,19 +419,6 @@
     }
 
     GameState.setPhase(inCombat ? PHASES.COMBAT : PHASES.EXPLORING);
-  }
-
-  function checkLevelUp(player) {
-    const xpNeeded = XP_PER_LEVEL[player.level - 1] || XP_PER_LEVEL[XP_PER_LEVEL.length - 1];
-    while (player.xp >= xpNeeded && player.level < 20) {
-      player.xp -= xpNeeded;
-      player.level++;
-      player.maxHp += 10;
-      player.hp = player.maxHp;
-      player.attack += 2;
-      player.defense += 1;
-      GameState.addMessage('Level up! You are now level ' + player.level + '!', 'system');
-    }
   }
 
   // ── Death / Victory ────────────────────────────────────────
@@ -499,6 +515,15 @@
       state.player = data.player || null;
       state.groundItems = data.groundItems || [];
       state.messages = data.messages || [];
+
+      // Re-link player to entities array to maintain reference identity
+      if (state.player && state.entities) {
+        const playerInEntities = state.entities.find(e => e.id === state.player.id);
+        if (playerInEntities) {
+          Object.assign(playerInEntities, state.player);
+          state.player = playerInEntities;
+        }
+      }
 
       // Restore item identification state
       if (data.identificationState && window.ItemSystem && ItemSystem.restoreIdentificationState) {
