@@ -74,3 +74,13 @@
 - **Help overlay documents:** All 12 class abilities (power_strike, fireball, backstab, heal, etc.) with descriptions and resource costs
 - **Help key:** Press `?` or `h` in-game to see full ability list and combat controls
 - **No action needed:** Leonard's ability system is already complete; help screen displays existing data
+
+### Class-Based Regeneration System (2026-02-25)
+- **REGEN_RATES** added to `constants.js`: per-class HP/mana/stamina regen rates (Warrior 2/0/3, Mage 1/3/1, Rogue 1/0/3, Cleric 2/2/2)
+- **`CombatSystem.regenerate(entity)`** added to `combat.js`: applies class-based regen, only during EXPLORING phase, capped at max values, logs only when something regenerated
+- **Old flat regen removed** from `processTurnStart()` (was +2 stamina, +1 mana for all players regardless of class)
+- **Hooked into main.js** `processPlayerAction()`: called after turn advance and FOV recompute, before combat phase check
+- **Design rationale:** Warriors/Rogues get high stamina regen (ability-spam), Mages get high mana regen (spell-dependent), Clerics are balanced. No class gets more than 3 in any stat per turn to keep regen meaningful but not trivializing.
+- **Help screen updated** in `hud.js` with new REGENERATION section showing per-class rates
+- **README updated** with Resource Regeneration section in Game Systems
+- **Tests updated** in `test-combat.js`: old flat regen test replaced with 4 new tests covering class-based regen, max cap, and combat phase skip

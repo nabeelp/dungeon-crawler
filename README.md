@@ -73,6 +73,18 @@ Healer and buffer; survives through sustain and support.
 
 ## Game Systems
 
+### Resource Regeneration
+Each class passively regenerates HP, mana, and stamina at different rates per turn while exploring (not during combat):
+
+| Class | HP/turn | Mana/turn | Stamina/turn |
+|-------|---------|-----------|--------------|
+| Warrior | 2 | 0 | 3 |
+| Mage | 1 | 3 | 1 |
+| Rogue | 1 | 0 | 3 |
+| Cleric | 2 | 2 | 2 |
+
+Regeneration never exceeds maximum values. A log message appears when resources are restored.
+
 ### Combat
 Turn-based system with action resolution:
 - **Melee Attacks** — Walk into an enemy to deal base damage (attacker stats - half defender defense)

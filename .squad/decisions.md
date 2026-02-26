@@ -275,6 +275,50 @@ Added three UI features to hud.js and main.js:
 
 ---
 
+## 10. Class-Based Resource Regeneration
+
+**Author:** Leonard (Combat + Enemy AI)  
+**Date:** 2026-02-25  
+**Status:** Implemented  
+
+Added per-class passive resource regeneration that triggers once per player turn during EXPLORING phase only.
+
+### Regen Rates (per turn)
+
+| Class   | HP | Mana | Stamina | Rationale |
+|---------|----|----|---------|-----------|
+| Warrior | 2  | 0  | 3       | Stamina-heavy abilities, tanky, no spells |
+| Mage    | 1  | 3  | 1       | Spell-dependent glass cannon |
+| Rogue   | 1  | 0  | 3       | Ability-spam playstyle, no spells |
+| Cleric  | 2  | 2  | 2       | Balanced healer/support |
+
+### Key Decisions
+
+1. **Regen is exploring-only.** No passive regen during combat phase — keeps fights dangerous.
+2. **Removed old flat regen** from `processTurnStart()` (was +2 stamina, +1 mana for all classes). Replaced with class-differentiated system.
+3. **REGEN_RATES lives in constants.js** alongside CLASSES. This required modifying Sheldon's file — rates are frozen and exported on `window.Constants`.
+4. **Log message only when something regenerated** to avoid spam when at full resources.
+5. **Values kept small (1-3)** — this is passive recovery, not a heal spell.
+
+### Impact on Other Agents
+
+- **Sheldon:** `constants.js` modified to add `REGEN_RATES`. Frozen object, read-only.
+- **Howard:** Help screen in `hud.js` updated with new REGENERATION section. `main.js` hook uses standard `window.CombatSystem &&` guard pattern.
+- **Amy:** Test `processTurnStart regens mana/stamina` updated — old flat regen removed, 4 new regen tests added.
+- **Raj:** No impact. ItemSystem buff ticking is unaffected.
+
+---
+
+## 11. Documentation Update Directive
+
+**Author:** Copilot (via Nabeel)  
+**Date:** 2026-02-26  
+**Status:** Active  
+
+Always ensure that documentation (README.md, help screens, etc.) is kept up to date as the solution continues to evolve. Any code change that affects controls, features, classes, items, or game systems must include corresponding documentation updates.
+
+---
+
 ## 6. XP Progression Curve Fix
 
 **Author:** Sheldon (Lead + Dungeon Generation)  

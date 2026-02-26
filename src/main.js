@@ -156,6 +156,11 @@
       // Check combat phase
       checkCombatPhase();
 
+      // Class-based resource regeneration (exploring only)
+      if (window.CombatSystem && CombatSystem.regenerate) {
+        CombatSystem.regenerate(player);
+      }
+
       // Check player death
       if (player.hp <= 0) {
         player.alive = false;

@@ -141,6 +141,14 @@
     })
   });
 
+  // ── Per-Class Regeneration Rates (per turn, exploring only) ─
+  const REGEN_RATES = Object.freeze({
+    WARRIOR: Object.freeze({ hp: 2, mana: 0, stamina: 3 }),
+    MAGE:    Object.freeze({ hp: 1, mana: 3, stamina: 1 }),
+    ROGUE:   Object.freeze({ hp: 1, mana: 0, stamina: 3 }),
+    CLERIC:  Object.freeze({ hp: 2, mana: 2, stamina: 2 })
+  });
+
   // ── Game Phases ─────────────────────────────────────────────
   const PHASES = Object.freeze({
     TITLE:     'title',
@@ -184,6 +192,7 @@
     EQUIPMENT_SLOTS,
     ITEM_RARITIES,
     CLASSES,
+    REGEN_RATES,
     PHASES,
     DIRECTIONS,
     XP_PER_LEVEL

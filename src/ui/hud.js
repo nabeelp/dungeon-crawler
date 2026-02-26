@@ -531,6 +531,13 @@
     helpLine('⚠ Unidentified items may be harmful! (poison, curses)', '#FF6666');
     y += sectionGap;
 
+    // REGENERATION
+    sectionTitle('REGENERATION');
+    helpLine('Each class passively regenerates resources per turn while exploring:');
+    helpLine('Warrior: 2 HP, 3 stamina          Mage: 1 HP, 3 mana, 1 stamina', '#FF8844');
+    helpLine('Rogue:   1 HP, 3 stamina          Cleric: 2 HP, 2 mana, 2 stamina', '#66FF66');
+    y += sectionGap;
+
     // GAME INFO
     sectionTitle('GAME INFO');
     helpLine('Permadeath: when you die, it\'s over. Score is saved.');

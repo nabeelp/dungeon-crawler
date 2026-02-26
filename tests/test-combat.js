@@ -338,13 +338,44 @@
       expect(canAct).toBe(false);
     });
 
-    it('processTurnStart regens mana/stamina for player', function () {
+    it('processTurnStart does not regen (regen is separate)', function () {
       const player = makePlayer();
       player.stamina = 10;
       player.mana = 5;
       CombatSystem.processTurnStart(player);
-      expect(player.stamina).toBe(12); // +2
-      expect(player.mana).toBe(6);     // +1
+      expect(player.stamina).toBe(10);
+      expect(player.mana).toBe(5);
+    });
+
+    it('regenerate restores class-based resources during exploring', function () {
+      const player = makePlayer(); // WARRIOR: hp:2, mana:0, stamina:3
+      player.hp = 100;
+      player.stamina = 90;
+      player.mana = 15;
+      GameState.setPhase(PHASES.EXPLORING);
+      CombatSystem.regenerate(player);
+      expect(player.hp).toBe(102);
+      expect(player.stamina).toBe(93);
+      expect(player.mana).toBe(15); // Warrior has 0 mana regen
+    });
+
+    it('regenerate does not exceed max values', function () {
+      const player = makePlayer();
+      player.hp = player.maxHp;
+      player.stamina = player.maxStamina;
+      player.mana = player.maxMana;
+      GameState.setPhase(PHASES.EXPLORING);
+      CombatSystem.regenerate(player);
+      expect(player.hp).toBe(player.maxHp);
+      expect(player.stamina).toBe(player.maxStamina);
+    });
+
+    it('regenerate skips during combat phase', function () {
+      const player = makePlayer();
+      player.hp = 100;
+      GameState.setPhase(PHASES.COMBAT);
+      CombatSystem.regenerate(player);
+      expect(player.hp).toBe(100);
     });
   });
 

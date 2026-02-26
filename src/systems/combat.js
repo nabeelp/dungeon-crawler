@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const { MAP_WIDTH, MAP_HEIGHT, OPAQUE_TILES, XP_PER_LEVEL } = Constants;
+  const { MAP_WIDTH, MAP_HEIGHT, OPAQUE_TILES, XP_PER_LEVEL, REGEN_RATES, PHASES } = Constants;
 
   // ── Status Effect Defaults ────────────────────────────────
   const STATUS_DEFAULTS = {
@@ -574,13 +574,38 @@
     // Tick status effects at start of turn
     tickStatusEffects(entity);
 
-    // Regenerate small amount of stamina/mana each turn
-    if (entity.type === 'player') {
-      entity.stamina = Math.min(entity.maxStamina, entity.stamina + 2);
-      entity.mana = Math.min(entity.maxMana, entity.mana + 1);
+    return true; // Can act
+  }
+
+  // ── Class-Based Regeneration ────────────────────────────────
+  function regenerate(entity) {
+    if (!entity || !entity.alive) return;
+    if (GameState.getPhase() !== PHASES.EXPLORING) return;
+
+    const rates = REGEN_RATES[entity.classKey];
+    if (!rates) return;
+
+    const parts = [];
+
+    if (rates.hp > 0 && entity.hp < entity.maxHp) {
+      const gain = Math.min(rates.hp, entity.maxHp - entity.hp);
+      entity.hp += gain;
+      parts.push(gain + ' HP');
+    }
+    if (rates.mana > 0 && entity.mana < entity.maxMana) {
+      const gain = Math.min(rates.mana, entity.maxMana - entity.mana);
+      entity.mana += gain;
+      parts.push(gain + ' mana');
+    }
+    if (rates.stamina > 0 && entity.stamina < entity.maxStamina) {
+      const gain = Math.min(rates.stamina, entity.maxStamina - entity.stamina);
+      entity.stamina += gain;
+      parts.push(gain + ' stamina');
     }
 
-    return true; // Can act
+    if (parts.length > 0) {
+      GameState.addMessage('You regenerate ' + parts.join(', ') + '.', 'info');
+    }
   }
 
   // ── Public API ────────────────────────────────────────────
@@ -607,6 +632,9 @@
 
     // XP / leveling
     checkLevelUp,
+
+    // Regeneration
+    regenerate,
 
     // Utility
     hasLineOfSight,
