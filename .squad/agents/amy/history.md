@@ -113,3 +113,18 @@
   - Updated local loadGame helper to include reference identity fix (Object.assign + pointer swap)
 - **Key insight:** The split-brain bug was caused by JSON.parse creating separate objects for state.player and the matching entity in state.entities. Fix ensures they point to the same object after load.
 - **Key insight:** Self-targeting abilities (heal, war_cry, evade, arcane_shield) have type: 'self' — tryAbility in main.js must check ability type and skip enemy targeting for these.
+
+### Integration Wiring Tests (Retro Action #2) — COMPLETE
+
+- **File created:** `tests/test-integration.js`
+- **Updated:** `tests/index.html` — added all missing module scripts (fov.js, ai.js, monsters.js, renderer.js, hud.js, main.js) and the new test file
+- **29 integration wiring tests** across 7 describe blocks:
+  - **Game Initialization Wiring (3 tests):** ItemSystem.init exists and is callable with rng, all 12 required window modules exist (Constants, Utils, GameState, DungeonGenerator, FOVSystem, CombatSystem, AISystem, MonsterFactory, ItemSystem, Renderer, HUD, Game)
+  - **Turn Cycle Wiring (4 tests):** CombatSystem.tickStatusEffects, CombatSystem.processTurnStart, ItemSystem.tickBuffs, AISystem.processAllMonsters all exist as functions
+  - **Kill Wiring (2 tests):** CombatSystem.onKill, ItemSystem.dropLoot exist as functions
+  - **Save/Load Wiring (2 tests):** ItemSystem.getIdentificationState, ItemSystem.restoreIdentificationState exist as functions
+  - **Cross-Module Data Contracts (6 tests):** createEntity includes statusEffects[], tags[], xpValue (preserved + default 0); createItem preserves _defKey and special
+  - **Module Init Order (2 tests):** Constants loads before GameState (PHASES available); all 11 module APIs are frozen/immutable
+  - **main.js Wiring Contracts (10 tests):** meleeAttack, useAbility, regenerate, placeItemsOnFloor, spawnForFloor, pickupItem, equipItem, unequipItem, useItem, dropItem, saveGame, loadGame all exist
+- **Key insight:** The retro identified that all 9 critical bugs were "never wired" integration gaps. These tests ensure every cross-module function that main.js needs actually exists and is callable, preventing future wiring regressions.
+- **Key insight:** The AI module is `window.AISystem` (not `AI`) and FOV is `window.FOVSystem` (not `FOV`) — test uses actual window names from the source.
