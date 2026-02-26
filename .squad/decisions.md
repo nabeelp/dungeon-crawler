@@ -752,3 +752,153 @@ The dungeon crawler has matured significantly. The architecture is clean — no 
 Clean module architecture with no circular deps, clear ownership, and frozen public APIs. IIFE pattern is simple and effective. The biggest structural risk: `GameState.state` exposed as mutable reference, directly causing Critical Bug #1. Game is playable and fun, but three critical bugs cause real player frustration (especially save/load corruption and self-heal blocking). **Recommend targeted bug-fix sprint for items #1-#3 before any new feature work.**
 
 — Sheldon, Lead Architect
+
+---
+
+## Decision #14: Leslie's Design Review Critique (2026-02-27)
+
+**By:** Leslie (Critic)  
+**Ceremony:** Design Review Critique  
+**Scope:** Validate Sheldon's B+ review; independent re-audit for critical bugs; game design assessment
+
+### Part 1: Verdict on Sheldon's Findings
+
+#### Sheldon's Critical #1 — Save/Load Split-Brain Player: ✅ CRITICAL (AGREE)
+
+`main.js:497-499`. After JSON deserialization, `state.player` and the matching entry in `state.entities` are separate objects. Movement updates `state.player` (via `getPlayer()`), but `getEntitiesOnFloor()` and `getEntityAt()` search `state.entities` — which has the stale copy. AoE attacks iterate `getEntitiesOnFloor()`, so they target the old player position. Post-load gameplay is silently corrupt.
+
+**Verdict:** Real critical bug. Silent corruption is the most dangerous kind.
+
+#### Sheldon's Critical #2 — Self-Targeting Abilities Blocked: ✅ CRITICAL (AGREE)
+
+`main.js:351-372`. `tryAbility()` requires a visible enemy within `FOV_RADIUS` for ALL abilities. Self-targeting abilities (Heal, War Cry, Evade, Arcane Shield, Divine Shield) are completely unusable when no enemies nearby.
+
+**Verdict:** Cripples 5 of 12 abilities and 4 of 4 classes. Critical game-breaking bug.
+
+#### Sheldon's Critical #3 — Duplicate checkLevelUp: ⚠️ SERIOUS (DOWNGRADE)
+
+`main.js:395-406` has different stat values than `combat.js:303-319`. The fallback path only fires when `window.CombatSystem` doesn't exist. Since `combat.js` is loaded before `main.js`, CombatSystem is always available. Code is **unreachable dead code**. Calling unreachable code "critical" is overrating it.
+
+**Verdict:** Downgrade to 🟡 SERIOUS (maintenance hazard, not player-facing). Should be removed.
+
+### Part 2: Previous Fix Verification
+
+All 6 fixes from Decision #13 landed cleanly:
+1. ✅ Double XP / Level-Up — Fixed in tryMove delegation
+2. ✅ createItem strips custom props — Fixed with prop copying loop
+3. ✅ ItemSystem.init() never called — Fixed, now called with seed
+4. ✅ dropLoot() never called — Fixed, called in onKill()
+5. ✅ tickBuffs() never called — Fixed, main loop ticks buffs
+6. ✅ Save/load field loss — Fixed, more fields survive serialization
+
+**Side effect:** Fix #6 made the split-brain reference issue (Critical #1) more visible.
+
+**Dead code to remove:** `main.js` lines 210-219 (fallback combat) and 395-406 (fallback checkLevelUp).
+
+### Part 3: What Sheldon Missed — NEW CRITICAL
+
+#### 🔴 NEW CRITICAL — Player Combat Status Effects Never Tick
+
+`CombatSystem.processTurnStart()` and `CombatSystem.tickStatusEffects()` are called for every monster via `processMonsterTurn()` (`ai.js:407`). **They are NEVER called for the player.**
+
+In `processPlayerAction()` (`main.js:130-188`):
+1. Player acts
+2. `AISystem.processAllMonsters()` — ticks **monster** status effects
+3. `ItemSystem.tickBuffs(player)` — ticks **item** buff timers only
+4. `CombatSystem.regenerate(player)`
+
+Missing: `CombatSystem.tickStatusEffects(player)` or `CombatSystem.processTurnStart(player)`.
+
+**Consequences:**
+
+| Effect | Should Happen | Actually Happens |
+|--------|---|---|
+| Poisoned (Spider) | 3 dmg/turn for 5 turns | Never ticks. Player immune to poison. |
+| Bleed (crit hit) | 2 dmg/turn for 3 turns | Never ticks. Player immune to bleed. |
+| War Cry buff (+7 atk) | Expires after 3 turns | **Never expires. +7 attack permanent. Stacks on every use.** |
+| Stun | Skip turn | Never checked for player. Player can't be stunned. |
+| Divine Shield (-50% dmg) | 2 turns | **Permanent 50% damage reduction.** |
+| Evade | Dodge 1 attack, then expire | Consumed on dodge, but duration never decrements. Never expires. |
+
+A Warrior casting War Cry 5 times gets permanent +35 attack. A Cleric casting Divine Shield once takes half damage forever. This breaks game balance in the player's favor while making enemy DOT do nothing.
+
+**Fix:** Add `CombatSystem.tickStatusEffects(player)` to `processPlayerAction()` before the player acts, symmetrically with monsters.
+
+#### 🟡 NEW SERIOUS — DOT Kills on Monsters Award No XP or Loot
+
+`combat.js:89-110`. When `tickStatusEffects()` kills a monster via poison or bleed:
+- Sets `alive = false`
+- Never calls `onKill()`
+- No XP awarded
+- No loot dropped
+
+Players who rely on DOT strategies (Rogue's Poison Blade, bleed from crits) lose all rewards for those kills.
+
+**Fix:** Call `onKill(killer, entity)` when DOT kills. Track source entity on status effects, or default to `getPlayer()` as killer.
+
+#### 🟡 NEW SERIOUS — Boss AI Flags Not in Entity Schema
+
+`_enraged`, `_telegraphing`, `_summonedPhase2`, `_summonedPhase3` are set on boss entity in `ai.js:322-350` but NOT in `createEntity()` schema (`gameState.js:19-85`). They survive serialization naturally but are invisible to the contract. Fragile by design.
+
+**Fix:** Add flags to `createEntity()` schema explicitly.
+
+### Part 4: Game Design Critique
+
+#### The 3 Gameplay Killers
+
+**1. Wait-to-Win Regen Loop** 🟡
+
+Class-based regen during EXPLORING phase means optimal strategy is: clear room → wait 60 turns → full heal → proceed. No food clock, no increasing danger, no reason NOT to turtle. Every fight becomes trivial because you always enter at full resources.
+
+This is the #1 fun-killer. It removes all tension from the dungeon. In classic roguelikes, regen is gated by food/hunger.
+
+**2. Melee-Only Basic Attacks** 🟡
+
+All 4 classes use melee for basic attacks. The Mage (60 HP, 4 defense, 6 attack) has to walk face-first into monsters for free attacks. Spells cost mana and have limited uses per rest. Optimal Mage play is melee everything and save mana for emergencies. That's not a Mage, that's a Warrior with a mana bar.
+
+No class has a free ranged basic attack. Mage and Cleric feel wrong.
+
+**3. Linear Descent With No Decisions** 🟡
+
+The game is: go down. That's it. No branching paths, no shops, no optional challenges, no reason to go back up. Every floor is structurally identical (BSP rooms + corridors). Only variance is monster types and loot RNG. By floor 5, player has seen everything mechanically.
+
+#### What Works
+
+- **Boss fight phases** — Telegraphed attacks, summons, enrage. Genuinely interesting.
+- **Identification system** — Risk/reward of using unknown potions. Classic roguelike tension.
+- **FOV + fog of war** — Exploration feels dangerous. Good.
+- **4 distinct classes** — Each has different feel (when abilities work).
+
+### Part 5: Final Verdict
+
+#### Grade: B- (downgraded from B+)
+
+The architecture is clean but the game has **4 critical bugs**, not 3:
+- Sheldon's Save/Load split-brain (confirmed critical)
+- Sheldon's Self-targeting abilities (confirmed critical)
+- NEW: Player status effects never tick (arguably worse than Sheldon's #3)
+- Sheldon's duplicate checkLevelUp (downgraded to serious)
+
+The previous fix sprint (Decision #13) was excellent. All 6 fixes landed cleanly. But the player status effect bug I found is arguably worse than any single bug in the last batch — it makes 5 of 12 abilities permanently stack and makes the player immune to all DOT effects.
+
+#### The 3 Most Impactful Things To Do Next
+
+**1. 🔴 Fix player combat status effect ticking** (`main.js`)
+
+Add `CombatSystem.tickStatusEffects(player)` to `processPlayerAction()`. Without this, combat balance is fiction. War Cry stacks forever. Poison does nothing. **#1 priority.**
+
+**2. 🔴 Fix save/load split-brain player** (`main.js:loadGame`)
+
+After restoring `state.entities`, find the player entity by type and set `state.player` to that reference. One-line fix, prevents silent corruption on every load.
+
+**3. 🔴 Fix self-targeting abilities** (`main.js:tryAbility`)
+
+Check `CombatSystem.getAbilityInfo(key).type` — if `'self'` or `'party'`, fire without requiring a target. Unblocks 5 abilities across all 4 classes.
+
+**Honorable mention:** Remove dead fallback code from `main.js` (lines 210-219, 395-406). Not hurting anyone today but it's a maintenance trap.
+
+#### Decision: User Directive on Leslie's Role
+
+**As of 2026-02-26T07:13:09Z:** Always include Leslie (Critic) in design reviews and all review ceremonies going forward. Leslie participates alongside the Lead as a reviewer.
+
+— Leslie, Critic

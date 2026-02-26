@@ -10,7 +10,7 @@
 | **When** | before |
 | **Condition** | multi-agent task involving 2+ agents modifying shared systems |
 | **Facilitator** | lead |
-| **Participants** | all-relevant |
+| **Participants** | all-relevant + Leslie (Critic, always included) |
 | **Time budget** | focused |
 | **Enabled** | ✅ yes |
 
