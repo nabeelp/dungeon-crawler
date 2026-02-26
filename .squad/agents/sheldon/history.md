@@ -170,3 +170,15 @@
 - **Bug:** Mage's auto-ranged Arcane Bolt (main.js:247-264) scanned tiles in the movement direction and attacked enemies even if they were hidden in fog of war. This let the player hit enemies they couldn't see, pulling aggro blindly.
 - **Fix:** Added `if (!visibleTiles.has(tx + ',' + ty)) break;` at main.js:257, before the `getEntityAt()` call. Uses the existing module-level `visibleTiles` Set (line 17), which is recomputed via `FOVSystem.compute()` on every move. Using `break` (not `continue`) because if a tile is outside FOV, all tiles further in that direction are also not visible.
 - **Impact:** Minimal, single-line addition. No new APIs, no cross-module changes.
+
+## Sprint Fixes (2026-02-27)
+
+### Fix 1: Trap RNG Non-Deterministic (main.js:269)
+- **Bug:** `Utils.createRNG(Date.now())` for trap damage broke seeded-PRNG architecture. Produced non-deterministic damage and near-identical results on rapid successive traps.
+- **Fix:** Changed seed to `GameState.state.seed + GameState.getTurnCounter()`. Trap damage is now deterministic per game seed and turn, matching the project's seeded-RNG contract.
+- **Impact:** One-line change, no new APIs.
+
+### Fix 2: Score Formula Rework (hud.js:462-471)
+- **Bug:** Old formula `(floor+1)*100 + level*50 + xp - turnCounter/10` penalized every turn equally. Since regen cooldowns mechanically force players to wait, this punished necessary gameplay.
+- **Fix:** New formula: `floor*1000 + level*200 + xp - max(0, turns - floor*100)*2`. Floor reached is now the dominant factor (1000/floor vs old 100). Turn penalty only applies above a generous threshold of 100 turns per floor. Efficient play is rewarded but regen waiting isn't punished.
+- **Impact:** `calculateScore()` rewritten. Victory screen still applies 2x multiplier. High score display unchanged (already shows score + floor, no turn count in listing).

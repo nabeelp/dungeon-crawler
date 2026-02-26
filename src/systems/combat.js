@@ -165,6 +165,9 @@
     initStatusEffects(target);
     let damage = rawDamage;
 
+    // Taking damage breaks stealth
+    if (target.stealthed) target.stealthed = false;
+
     // Evade check
     if (hasStatus(target, 'evading')) {
       target.statusEffects = target.statusEffects.filter(e => e.type !== 'evading');
@@ -241,6 +244,9 @@
 
   // ── Melee Attack ──────────────────────────────────────────
   function meleeAttack(attacker, defender) {
+    // Attacking breaks stealth
+    if (attacker.stealthed) attacker.stealthed = false;
+
     const dist = Utils.chebyshevDist(attacker.x, attacker.y, defender.x, defender.y);
 
     // Ranged basic attack for classes with rangedAttack (e.g., Mage Arcane Bolt)
@@ -479,14 +485,13 @@
       execute(user, target) {
         const dist = Utils.chebyshevDist(user.x, user.y, target.x, target.y);
         if (dist > 1) return fail('Too far for Backstab.');
-        // "Behind" = user is on the opposite side from where target is facing
-        // Simplified: if there's a player between, or if user approached from behind
-        // Use positional check: behind means user is not in front 3 tiles
-        const isBehind = isAttackerBehind(user, target);
-        const multiplier = isBehind ? 3 : 1.5;
+        // Full 3× when stealthed (from Evade) or target hasn't detected player yet
+        const isStealth = !!user.stealthed || !target.hasSeenPlayer;
+        const multiplier = isStealth ? 3 : 1.5;
         const rawDmg = Math.floor(calcBaseDamage(user, target) * multiplier);
         const dealt = applyDamage(target, rawDmg);
-        const msg = isBehind ? 'Backstab (from behind)' : 'Backstab';
+        const msg = isStealth ? 'Backstab (from stealth!)' : 'Backstab';
+        if (user.stealthed) user.stealthed = false;
         postAttackMsg(user, target, dealt, `${user.name} uses ${msg} on ${target.name} for ${dealt} damage!`);
         if (!target.alive) onKill(user, target);
         return true;
@@ -499,7 +504,8 @@
       type: 'self',
       execute(user) {
         addStatusEffect(user, 'evading', { duration: 1 });
-        GameState.addMessage(`${user.name} prepares to evade the next attack.`, 'combat');
+        user.stealthed = true;
+        GameState.addMessage(`${user.name} fades into the shadows, preparing to evade.`, 'combat');
         return true;
       }
     },

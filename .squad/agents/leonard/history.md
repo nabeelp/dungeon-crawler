@@ -365,3 +365,23 @@ The `regenCooldown` field is initialized to `0` in `createEntity()` (gameState.j
 ### Fix 2: AoE hits friendlies (MAJOR)
 - **Problem:** `aoeAttack()` in combat.js only filtered out `attacker.id`, meaning player fireballs hit allies and boss fireballs hit the boss's own whelps.
 - **Fix:** Added faction check in `aoeAttack()` after the self-skip: `if ((attacker.type === 'player') === (ent.type === 'player')) continue;`. Player AoE now only hits monsters; monster AoE only hits the player. Uses `entity.type` field ('player'|'monster'|'npc') which is already set on all entities via `createEntity()`. No full faction system needed.
+
+## Gameplay Sprint (2026-02-27)
+
+### Fix 1: Backstab Rework (stealth-based instead of facing)
+- **Problem:** `isAttackerBehind()` checked if attacker was behind the target, but monsters always face toward the player, so the 3× multiplier never triggered in solo play. Backstab was always 1.5×.
+- **combat.js — backstab ability:** Replaced facing-based check with stealth/detection check. `isStealth = !!user.stealthed || !target.hasSeenPlayer`. Full 3× when stealthed or target hasn't detected player; 1.5× otherwise. Clears `stealthed` flag after use.
+- **combat.js — evade ability:** Now also sets `user.stealthed = true`, creating a tactical Evade→Backstab combo. Message updated to "fades into the shadows."
+- **combat.js — meleeAttack():** Clears `attacker.stealthed` on any melee attack (regular attacks break stealth without getting the backstab bonus).
+- **combat.js — applyDamage():** Clears `target.stealthed` when taking damage (getting hit breaks stealth).
+- **ai.js — processMonsterTurn():** Sets `entity.hasSeenPlayer = true` when monster is within detection range (10 tiles). Undetected monsters remain vulnerable to stealth backstab.
+- **Tactical loop:** Rogue uses Evade (15 stamina) → dodges next attack + enters stealth → uses Backstab (20 stamina) next turn for 3× damage. Costs 35 stamina for the combo. First-strike backstab on undetected monsters is free (no Evade needed).
+
+### Fix 2: Wandering Monsters (exploration pressure)
+- **Problem:** Without time pressure, optimal play was "wait and regen." Needed a mechanic that makes waiting risky.
+- **constants.js:** Added `WANDERING_MONSTER_INTERVAL: 25` — every 25 turns on a floor, a wandering monster spawns. Exported on `window.Constants`.
+- **main.js — `spawnWanderingMonster()`:** New function. Collects walkable tiles outside FOV and ≥5 tiles from player. Uses seeded RNG (seed + turnCounter). Picks a floor-appropriate template via `MonsterFactory.getTemplatesForFloor()`. Buffs the spawned monster +20% HP, maxHP, attack, and XP. Shows "You hear something approaching..." message.
+- **main.js — `processPlayerAction()`:** Increments `player.floorTurns` each turn (both normal and stunned paths). Triggers `spawnWanderingMonster()` every `WANDERING_MONSTER_INTERVAL` turns.
+- **main.js — `changeFloor()`:** Resets `player.floorTurns = 0` on floor transition.
+- **main.js — `startNewGame()`:** Initializes `player.floorTurns = 0`.
+- **Save/load:** `floorTurns` is on the player entity, which is already fully serialized. No save/load changes needed.

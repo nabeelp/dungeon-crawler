@@ -98,6 +98,7 @@
     if (!player) return;
 
     drawBars(ctx, player);
+    drawStatusEffects(ctx, player);
     drawFloorIndicator(ctx, w);
     drawCharInfo(ctx, player);
     drawMessageLog(ctx, w, h);
@@ -114,6 +115,68 @@
     if (showInventory) {
       drawInventoryScreen(ctx, w, h, player);
     }
+  }
+
+  // ── Status Effects Display ──────────────────────────────────
+  function drawStatusEffects(ctx, player) {
+    const effects = [];
+
+    // Collect status effects
+    if (player.statusEffects && player.statusEffects.length > 0) {
+      for (const se of player.statusEffects) {
+        const label = getEffectLabel(se.type);
+        const color = getEffectColor(se.type);
+        effects.push({ label: label, dur: se.duration, color: color });
+      }
+    }
+
+    // Collect item buffs
+    if (player._buffs && player._buffs.length > 0) {
+      for (const b of player._buffs) {
+        const label = (b.stat || b.type || 'BUF').substring(0, 3).toUpperCase();
+        effects.push({ label: label, dur: b.duration || 0, color: '#44FF44' });
+      }
+    }
+
+    if (effects.length === 0) return;
+
+    const x = HUD_MARGIN;
+    const y = HUD_MARGIN + (BAR_HEIGHT + BAR_PADDING) * 3 + 2;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(x - 2, y - 2, BAR_WIDTH + 4, 18);
+
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    let tx = x + 2;
+    for (const eff of effects) {
+      const text = eff.label + (eff.dur > 0 ? ' ' + eff.dur : '');
+      ctx.fillStyle = eff.color;
+      ctx.fillText(text, tx, y + 2);
+      tx += ctx.measureText(text).width + 8;
+      if (tx > x + BAR_WIDTH - 10) break;
+    }
+  }
+
+  function getEffectLabel(type) {
+    const labels = {
+      poisoned: 'POI', bleed: 'BLD', stunned: 'STN', slowed: 'SLO',
+      shielded: 'SHL', buffed: 'STR', evading: 'EVD',
+      divine_shield: 'DIV', vulnerable: 'VUL'
+    };
+    return labels[type] || type.substring(0, 3).toUpperCase();
+  }
+
+  function getEffectColor(type) {
+    const colors = {
+      poisoned: '#FF4444', bleed: '#FF4444', stunned: '#FF4444',
+      slowed: '#FF4444', vulnerable: '#FF4444',
+      shielded: '#4488FF', divine_shield: '#4488FF',
+      buffed: '#44FF44', evading: '#44FF44'
+    };
+    return colors[type] || '#CCCC44';
   }
 
   // ── Status Bars ────────────────────────────────────────────
@@ -174,7 +237,7 @@
   // ── Character Info ─────────────────────────────────────────
   function drawCharInfo(ctx, player) {
     const x = HUD_MARGIN;
-    let y = HUD_MARGIN + (BAR_HEIGHT + BAR_PADDING) * 3 + 8;
+    let y = HUD_MARGIN + (BAR_HEIGHT + BAR_PADDING) * 3 + 26;
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(x - 2, y - 2, BAR_WIDTH + 4, 60);
@@ -460,11 +523,14 @@
   }
 
   function calculateScore(player) {
-    const baseScore = (GameState.getCurrentFloor() + 1) * 100
-      + player.level * 50
+    const floor = GameState.getCurrentFloor() + 1;
+    const turns = GameState.getTurnCounter();
+    const baseScore = floor * 1000
+      + player.level * 200
       + player.xp;
-    const turnPenalty = Math.floor(GameState.getTurnCounter() / 10);
-    return Math.max(0, baseScore - turnPenalty);
+    // Only penalize turns above a generous threshold (100 turns per floor)
+    const excessTurns = Math.max(0, turns - floor * 100);
+    return Math.max(0, baseScore - excessTurns * 2);
   }
 
   // ── Help Screen Overlay ─────────────────────────────────────
@@ -539,6 +605,7 @@
     helpLine('Warrior: 2 HP, 3 stamina          Mage: 1 HP, 3 mana, 1 stamina', '#FF8844');
     helpLine('Rogue:   1 HP, 3 stamina          Cleric: 2 HP, 2 mana, 2 stamina', '#66FF66');
     helpLine('Post-combat regen window: Warrior 5, Rogue 5, Cleric 7, Mage 8 turns');
+    helpLine('Regen stops after the cooldown expires — no infinite healing!', '#FF6666');
     y += sectionGap;
 
     // GAME INFO
@@ -546,6 +613,7 @@
     helpLine('Permadeath: when you die, it\'s over. Score is saved.');
     helpLine('Explore 10 floors of increasing difficulty');
     helpLine('Enemies get stronger each floor — gear up!');
+    helpLine('⚠ Monsters grow restless the longer you linger on a floor!', '#FF6666');
     helpLine('Save is automatic when you close the browser');
     helpLine('?  or  H  to toggle this help screen');
     y += sectionGap + 4;

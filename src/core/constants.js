@@ -158,6 +158,9 @@
     CLERIC:  7
   });
 
+  // ── Wandering Monster Interval ─────────────────────────────
+  const WANDERING_MONSTER_INTERVAL = 25;
+
   // ── Game Phases ─────────────────────────────────────────────
   const PHASES = Object.freeze({
     TITLE:     'title',
@@ -203,6 +206,7 @@
     CLASSES,
     REGEN_RATES,
     REGEN_COOLDOWN,
+    WANDERING_MONSTER_INTERVAL,
     PHASES,
     DIRECTIONS,
     XP_PER_LEVEL

@@ -11,7 +11,7 @@
   'use strict';
 
   const { TILES, TILE_SIZE, MAP_WIDTH, MAP_HEIGHT, MAX_FLOORS, FOV_RADIUS,
-          PHASES, CLASSES, WALKABLE_TILES } = Constants;
+          PHASES, CLASSES, WALKABLE_TILES, WANDERING_MONSTER_INTERVAL } = Constants;
 
   let canvas = null;
   let visibleTiles = new Set();
@@ -103,6 +103,7 @@
     });
     GameState.addEntity(player);
     GameState.setPlayer(player);
+    player.floorTurns = 0;
 
     // Initialize item identification system before any items are generated
     if (window.ItemSystem && ItemSystem.init) {
@@ -149,6 +150,10 @@
       }
       GameState.advanceTurn();
       recomputeFOV();
+      player.floorTurns = (player.floorTurns || 0) + 1;
+      if (WANDERING_MONSTER_INTERVAL && player.floorTurns % WANDERING_MONSTER_INTERVAL === 0) {
+        spawnWanderingMonster(player);
+      }
       checkCombatPhase();
       if (window.ItemSystem && ItemSystem.tickBuffs) {
         ItemSystem.tickBuffs(player);
@@ -192,6 +197,12 @@
 
       GameState.advanceTurn();
       recomputeFOV();
+
+      // Wandering monster check
+      player.floorTurns = (player.floorTurns || 0) + 1;
+      if (WANDERING_MONSTER_INTERVAL && player.floorTurns % WANDERING_MONSTER_INTERVAL === 0) {
+        spawnWanderingMonster(player);
+      }
 
       // Check combat phase
       checkCombatPhase();
@@ -266,7 +277,7 @@
 
     // Check for trap
     if (tileType === TILES.TRAP) {
-      const trapDmg = Utils.createRNG(Date.now()).randInt(3, 8);
+      const trapDmg = Utils.createRNG(GameState.state.seed + GameState.getTurnCounter()).randInt(3, 8);
       player.hp -= trapDmg;
       GameState.addMessage('You triggered a trap! ' + trapDmg + ' damage!', 'combat');
       Renderer.triggerShake(Math.min(trapDmg / 10, 5));
@@ -321,6 +332,47 @@
     return true;
   }
 
+  // ── Wandering Monster Spawn ─────────────────────────────────
+  function spawnWanderingMonster(player) {
+    if (!window.MonsterFactory) return;
+    const floor = player.floor;
+    const tiles = GameState.getCurrentTiles();
+    if (!tiles) return;
+
+    // Collect candidate tiles: walkable, not visible, min 5 tiles from player, unoccupied
+    const candidates = [];
+    for (let y = 0; y < MAP_HEIGHT; y++) {
+      for (let x = 0; x < MAP_WIDTH; x++) {
+        if (!WALKABLE_TILES.has(tiles[y][x])) continue;
+        if (visibleTiles.has(x + ',' + y)) continue;
+        if (Utils.chebyshevDist(player.x, player.y, x, y) < 5) continue;
+        if (GameState.getEntityAt(x, y, floor)) continue;
+        candidates.push({ x, y });
+      }
+    }
+    if (candidates.length === 0) return;
+
+    const spawnRng = Utils.createRNG(GameState.state.seed + GameState.getTurnCounter());
+    const pos = spawnRng.pick(candidates);
+
+    const templates = MonsterFactory.getTemplatesForFloor(floor);
+    const regular = templates.filter(t => !t.isBoss);
+    if (regular.length === 0) return;
+
+    const template = spawnRng.pick(regular);
+    const monster = MonsterFactory.createMonster(template.key, floor, pos.x, pos.y);
+    if (!monster) return;
+
+    // Wandering monsters are slightly stronger (+20%)
+    monster.hp = Math.floor(monster.hp * 1.2);
+    monster.maxHp = Math.floor(monster.maxHp * 1.2);
+    monster.attack = Math.floor(monster.attack * 1.2);
+    monster.xpValue = Math.floor(monster.xpValue * 1.2);
+
+    GameState.addEntity(monster);
+    GameState.addMessage('You hear something approaching...', 'system');
+  }
+
   function changeFloor(targetFloor, direction) {
     const player = GameState.getPlayer();
 
@@ -356,6 +408,7 @@
     }
 
     player.floor = targetFloor;
+    player.floorTurns = 0;
     GameState.setCurrentFloor(targetFloor);
     GameState.addMessage('You ' + (direction === 'down' ? 'descend' : 'ascend') +
       ' to floor ' + (targetFloor + 1) + '.', 'system');

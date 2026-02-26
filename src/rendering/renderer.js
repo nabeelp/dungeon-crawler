@@ -240,8 +240,24 @@
       const screenX = entity.x * TILE_SIZE - camX;
       const screenY = entity.y * TILE_SIZE - camY;
 
-      // Monster: red square with first letter
-      ctx.fillStyle = '#CC0000';
+      // Color-code monster by difficulty tier based on xpValue
+      const xp = entity.xpValue || 0;
+      let monsterColor;
+      if (entity.color) {
+        monsterColor = entity.color;
+      } else if (xp >= 200) {
+        monsterColor = '#fa0'; // boss/gold
+      } else if (xp >= 50) {
+        monsterColor = '#f44'; // tier 4 red
+      } else if (xp >= 25) {
+        monsterColor = '#48f'; // tier 3 blue
+      } else if (xp >= 15) {
+        monsterColor = '#4a4'; // tier 2 green
+      } else {
+        monsterColor = '#888'; // tier 1 gray
+      }
+
+      ctx.fillStyle = monsterColor;
       ctx.fillRect(screenX + 2, screenY + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       ctx.fillStyle = '#FFF';
       ctx.font = 'bold ' + (TILE_SIZE * 0.6) + 'px monospace';
@@ -252,6 +268,17 @@
         screenX + TILE_SIZE / 2,
         screenY + TILE_SIZE / 2
       );
+
+      // HP bar above monster
+      const barW = TILE_SIZE;
+      const barH = 3;
+      const barX = screenX;
+      const barY = screenY - barH - 1;
+      const hpRatio = entity.maxHp > 0 ? Math.max(0, entity.hp / entity.maxHp) : 0;
+      ctx.fillStyle = '#440000';
+      ctx.fillRect(barX, barY, barW, barH);
+      ctx.fillStyle = '#CC0000';
+      ctx.fillRect(barX, barY, barW * hpRatio, barH);
     }
 
     // Draw player

@@ -131,3 +131,10 @@
 - **Fix — Trap damage in main.js `tryMove()`:** Added red damage number and screen shake when player triggers a trap.
 - **Fix — Player death in main.js `handleDeath()`:** Added strong shake (intensity 8) on player death for dramatic effect.
 - **Guard pattern:** All combat.js hooks use `window.Renderer &&` since combat.js loads before renderer.js. main.js hooks call Renderer directly since it's a hard dependency that's always loaded by that point.
+
+### Visual Polish Sprint (Howard)
+
+- **Task 1 — Monster HP bars:** Added 3px HP bars above every visible monster in renderer.js entity rendering loop. Dark red background (`#440000`) with bright red fill (`#CC0000`), width proportional to `entity.hp / entity.maxHp`. Positioned 1px above the monster tile. Only drawn for monsters in `visibleTiles` (not in fog).
+- **Task 2 — Status effect icons in HUD:** Added `drawStatusEffects()` function in hud.js, called after `drawBars()`. Collects active effects from `player.statusEffects[]` and `player._buffs[]`, displays them as colored 3-letter codes with remaining duration (e.g., "POI 3", "SHL 2"). Color-coded: red = debuffs (poison, bleed, stun, slow, vulnerable), blue = shields (shielded, divine_shield), green = buffs (buffed, evading). Shifted `drawCharInfo` down 18px to make room.
+- **Task 3 — Monster color by tier:** Replaced hardcoded `#CC0000` monster color with xpValue-based tiering: gray (#888) for xpValue <15 (rats, bats), green (#4a4) for 15-24, blue (#48f) for 25-49, red (#f44) for 50-199, gold (#fa0) for 200+ (bosses). Uses `entity.color` override if present. Letter overlay preserved for identification.
+- **Task 4 — Help screen updates:** Added regen cooldown clarification line ("Regen stops after the cooldown expires — no infinite healing!") to REGENERATION section. Added wandering monster warning ("Monsters grow restless the longer you linger on a floor!") to GAME INFO section. Both styled with red warning color (#FF6666).

@@ -428,6 +428,9 @@
     const dist = Utils.chebyshevDist(entity.x, entity.y, player.x, player.y);
     if (dist > 10) return;
 
+    // Mark that this monster has detected the player (for backstab stealth check)
+    entity.hasSeenPlayer = true;
+
     // Dispatch to behavior
     const behavior = BEHAVIORS[entity.ai] || BEHAVIORS.aggressive;
     behavior(entity, player, tiles);
