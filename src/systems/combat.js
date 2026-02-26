@@ -23,6 +23,17 @@
     vulnerable: { duration: 3 }
   };
 
+  // ── Seeded RNG Reference ──────────────────────────────────
+  let _rng = null;
+
+  function init(rng) {
+    _rng = rng;
+  }
+
+  function rng() {
+    return _rng ? _rng.random() : Math.random();
+  }
+
   // ── Bresenham's Line ──────────────────────────────────────
   function bresenhamLine(x0, y0, x1, y1) {
     const points = [];
@@ -91,23 +102,25 @@
     const expiring = [];
     entity.statusEffects = entity.statusEffects.filter(effect => {
       // Poison tick
-      if (effect.type === 'poisoned' && effect.damage) {
+      if (effect.type === 'poisoned' && effect.damage && entity.alive) {
         entity.hp -= effect.damage;
         GameState.addMessage(`${entity.name} takes ${effect.damage} poison damage.`, 'combat');
         if (entity.hp <= 0) {
           entity.hp = 0;
           entity.alive = false;
           GameState.addMessage(`${entity.name} dies from poison!`, 'combat');
+          onKill(effect.source || null, entity);
         }
       }
       // Bleed tick
-      if (effect.type === 'bleed' && effect.damage) {
+      if (effect.type === 'bleed' && effect.damage && entity.alive) {
         entity.hp -= effect.damage;
         GameState.addMessage(`${entity.name} takes ${effect.damage} bleed damage.`, 'combat');
         if (entity.hp <= 0) {
           entity.hp = 0;
           entity.alive = false;
           GameState.addMessage(`${entity.name} bleeds out!`, 'combat');
+          onKill(effect.source || null, entity);
         }
       }
       effect.duration--;
@@ -134,7 +147,7 @@
 
   // ── Damage Calculation ────────────────────────────────────
   function calcBaseDamage(attacker, defender) {
-    const variance = Math.floor(Math.random() * 5) - 2; // -2 to +2
+    const variance = Math.floor(rng() * 5) - 2; // -2 to +2
     return Math.max(1, attacker.attack - Math.floor(defender.defense / 2) + variance);
   }
 
@@ -200,7 +213,7 @@
     if (isCrit) {
       GameState.addMessage(`CRITICAL! ${baseMsg}${hpTag}`, 'combat');
       if (defender.alive) {
-        addStatusEffect(defender, 'bleed', { duration: 3, damage: 2 });
+        addStatusEffect(defender, 'bleed', { duration: 3, damage: 2, source: attacker });
         GameState.addMessage(`${defender.name} is bleeding!`, 'combat');
       }
     } else {
@@ -212,6 +225,26 @@
   // ── Melee Attack ──────────────────────────────────────────
   function meleeAttack(attacker, defender) {
     const dist = Utils.chebyshevDist(attacker.x, attacker.y, defender.x, defender.y);
+
+    // Ranged basic attack for classes with rangedAttack (e.g., Mage Arcane Bolt)
+    if (dist > 1 && attacker.classKey) {
+      const classDef = Constants.CLASSES[attacker.classKey];
+      if (classDef && classDef.rangedAttack && dist <= classDef.rangedAttack.range) {
+        const tiles = GameState.getCurrentTiles();
+        if (tiles && hasLineOfSight(attacker.x, attacker.y, defender.x, defender.y, tiles)) {
+          const rawDmg = Math.max(1, Math.floor(calcBaseDamage(attacker, defender) * classDef.rangedAttack.damageMultiplier));
+          const dealt = applyDamage(defender, rawDmg);
+          if (dealt > 0) {
+            postAttackMsg(attacker, defender, dealt, `${attacker.name} fires an Arcane Bolt at ${defender.name} for ${dealt} damage`);
+          }
+          if (!defender.alive) {
+            onKill(attacker, defender);
+          }
+          return true;
+        }
+      }
+    }
+
     if (dist > 1) {
       GameState.addMessage(`${defender.name} is too far for melee.`, 'combat');
       return false;
@@ -288,7 +321,7 @@
   // ── XP and Leveling ───────────────────────────────────────
   function onKill(killer, victim) {
     GameState.addMessage(`${victim.name} is slain!`, 'combat');
-    if (killer.type === 'player' && victim.xpValue) {
+    if (killer && killer.type === 'player' && victim.xpValue) {
       killer.xp += victim.xpValue;
       GameState.addMessage(`+${victim.xpValue} XP`, 'system');
       checkLevelUp(killer);
@@ -457,7 +490,7 @@
         if (dist > 1) return fail('Too far for Poison Blade.');
         const rawDmg = calcBaseDamage(user, target);
         const dealt = applyDamage(target, rawDmg);
-        addStatusEffect(target, 'poisoned', { duration: 5, damage: 3 });
+        addStatusEffect(target, 'poisoned', { duration: 5, damage: 3, source: user });
         postAttackMsg(user, target, dealt, `${user.name} poisons ${target.name} for ${dealt} damage! Poisoned for 5 turns`);
         if (!target.alive) onKill(user, target);
         return true;
@@ -586,6 +619,11 @@
     if (!entity || !entity.alive) return;
     if (GameState.getPhase() !== PHASES.EXPLORING) return;
 
+    // Post-combat regen cooldown: only regen for 5 turns after combat ends
+    if (entity.regenCooldown === undefined) entity.regenCooldown = 5;
+    if (entity.regenCooldown <= 0) return;
+    entity.regenCooldown--;
+
     const rates = REGEN_RATES[entity.classKey];
     if (!rates) return;
 
@@ -614,6 +652,9 @@
 
   // ── Public API ────────────────────────────────────────────
   window.CombatSystem = Object.freeze({
+    // Initialization
+    init,
+
     // Core attacks
     meleeAttack,
     rangedAttack,

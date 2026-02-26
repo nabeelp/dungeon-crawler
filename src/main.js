@@ -110,6 +110,14 @@
       ItemSystem.init(idRng);
     }
 
+    // Initialize combat and AI RNG for determinism
+    if (window.CombatSystem && CombatSystem.init) {
+      CombatSystem.init(Utils.createRNG(GameState.state.seed + 777));
+    }
+    if (window.AISystem && AISystem.init) {
+      AISystem.init(Utils.createRNG(GameState.state.seed + 888));
+    }
+
     // Spawn monsters if MonsterFactory is available
     if (window.MonsterFactory && MonsterFactory.spawnForFloor) {
       const rng = Utils.createRNG(GameState.state.seed);
@@ -245,6 +253,25 @@
     // Move player
     player.x = newX;
     player.y = newY;
+
+    // Auto ranged attack (e.g., Mage Arcane Bolt) — scan move direction for enemies
+    if (window.CombatSystem && player.classKey) {
+      const classDef = Constants.CLASSES[player.classKey];
+      if (classDef && classDef.rangedAttack) {
+        const range = classDef.rangedAttack.range;
+        for (let i = 2; i <= range; i++) {
+          const tx = newX + dx * i;
+          const ty = newY + dy * i;
+          if (!Utils.inBounds(tx, ty)) break;
+          if (!WALKABLE_TILES.has(tiles[ty][tx])) break;
+          const rangeTarget = GameState.getEntityAt(tx, ty, player.floor);
+          if (rangeTarget && rangeTarget.type === 'monster' && rangeTarget.alive) {
+            CombatSystem.meleeAttack(player, rangeTarget);
+            break;
+          }
+        }
+      }
+    }
 
     // Check for trap
     if (tileType === TILES.TRAP) {
@@ -418,7 +445,15 @@
       }
     }
 
-    GameState.setPhase(inCombat ? PHASES.COMBAT : PHASES.EXPLORING);
+    const oldPhase = GameState.getPhase();
+    const newPhase = inCombat ? PHASES.COMBAT : PHASES.EXPLORING;
+
+    // Reset regen cooldown when exiting combat
+    if (oldPhase === PHASES.COMBAT && newPhase === PHASES.EXPLORING) {
+      player.regenCooldown = 5;
+    }
+
+    GameState.setPhase(newPhase);
   }
 
   // ── Death / Victory ────────────────────────────────────────
@@ -528,6 +563,14 @@
       // Restore item identification state
       if (data.identificationState && window.ItemSystem && ItemSystem.restoreIdentificationState) {
         ItemSystem.restoreIdentificationState(data.identificationState);
+      }
+
+      // Re-initialize combat and AI RNG from seed
+      if (window.CombatSystem && CombatSystem.init) {
+        CombatSystem.init(Utils.createRNG(state.seed + 777));
+      }
+      if (window.AISystem && AISystem.init) {
+        AISystem.init(Utils.createRNG(state.seed + 888));
       }
 
       return true;

@@ -113,7 +113,8 @@
         attack: 6, defense: 4,
         speed: 10
       }),
-      abilities: Object.freeze(['fireball', 'ice_shard', 'arcane_shield'])
+      abilities: Object.freeze(['fireball', 'ice_shard', 'arcane_shield']),
+      rangedAttack: Object.freeze({ range: 4, damageMultiplier: 0.5 })
     }),
     ROGUE: Object.freeze({
       name: 'Rogue',

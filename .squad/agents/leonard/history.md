@@ -117,3 +117,31 @@
 - **Bugs fixed:** Double XP (Leonard), createItem props (Sheldon), ItemSystem.init wiring (Howard), dropLoot wiring (Leonard), tickBuffs wiring (Howard), save/load state (Sheldon + Howard)
 - **Test coverage:** 17 new regression tests (6 combat, 7 items, 7 save/load) — all passing
 - **Decision docs:** All inbox files merged into decisions.md; orchestration logs created
+
+## P0/P1 Fixes (2026-02-27)
+
+### 1. Seeded RNG (P0)
+- **combat.js:** Added `let _rng = null`, `init(rng)` function, and `rng()` fallback helper. Replaced `Math.random()` in `calcBaseDamage()` with `rng()`. Exported `init` on `CombatSystem`.
+- **ai.js:** Same pattern — `_rng`, `init(rng)`, `rng()` helper. Replaced all 10 `Math.random()` calls across `behaviorAggressive`, `behaviorFlanking`, `behaviorCautious`, `behaviorRanged`, `bossRegularAction`, and `behaviorBoss`.
+- **main.js:** Wired `CombatSystem.init(seed+777)` and `AISystem.init(seed+888)` in both `startNewGame()` and `loadGame()`.
+- **Pattern:** Follows ItemSystem.init(rng) pattern from Raj. Seed offsets 777/888 avoid collision with existing streams (999, 500, base).
+
+### 2. AoE kills call onKill (P0)
+- **Already fixed.** Verified `aoeAttack()` already calls `onKill(attacker, ent)` after setting `ent.alive = false`. This was fixed in the previous bug sprint.
+
+### 3. DOT kills call onKill (P2)
+- **combat.js:** Added `onKill(effect.source || null, entity)` after poison and bleed kill entities in `tickStatusEffects()`.
+- Added `entity.alive` guards to both DOT blocks to prevent double-damage/double-kill when entity has both poison and bleed.
+- Added `source` field to DOT status effects: `poison_blade` sets `source: user`, `postAttackMsg` crit bleed sets `source: attacker`.
+- Guarded `onKill()` for null killer (`if (killer && killer.type === 'player')`) so DOT kills without a tracked source still drop loot/announce death but don't crash on XP award.
+
+### 4. Regen Cooldown (P1)
+- **combat.js `regenerate()`:** Added `regenCooldown` field. Initialized to 5 on first call (`=== undefined` check). Decremented each EXPLORING turn. Regen blocked when `<= 0`.
+- **main.js `checkCombatPhase()`:** Detects COMBAT→EXPLORING transition and resets `player.regenCooldown = 5`. Gives 5 turns of post-combat recovery.
+- **Design:** Players start with 5 regen turns (handles game start). Each combat exit resets the window. Prevents infinite wait-to-heal exploit identified by Leslie.
+
+### 5. Mage Arcane Bolt (P1)
+- **constants.js:** Added `rangedAttack: { range: 4, damageMultiplier: 0.5 }` to MAGE class definition.
+- **combat.js `meleeAttack()`:** Added ranged attack path before the "too far" fail. Checks `attacker.classKey`, looks up `Constants.CLASSES`, verifies `dist <= range` and LOS. Applies 50% base damage. Calls `onKill` on kill.
+- **main.js `tryMove()`:** After player moves to empty tile, scans movement direction for enemies at range 2–4. If found, calls `CombatSystem.meleeAttack()` which routes to the ranged path.
+- **README.md:** Documented Arcane Bolt as passive under Mage class. Added regen cooldown note under Resource Regeneration.

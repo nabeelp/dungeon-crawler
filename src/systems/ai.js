@@ -10,6 +10,17 @@
 
   const { MAP_WIDTH, MAP_HEIGHT, WALKABLE_TILES } = Constants;
 
+  // ── Seeded RNG Reference ──────────────────────────────────
+  let _rng = null;
+
+  function init(rng) {
+    _rng = rng;
+  }
+
+  function rng() {
+    return _rng ? _rng.random() : Math.random();
+  }
+
   // ── A* Pathfinding ────────────────────────────────────────
   function astar(startX, startY, goalX, goalY, tiles, floor) {
     if (startX === goalX && startY === goalY) return [];
@@ -151,8 +162,8 @@
     // Adjacent — attack
     if (dist <= 1) {
       // Use abilities if available and have resources
-      if (entity.abilities.length > 0 && Math.random() < 0.3) {
-        const abilityKey = entity.abilities[Math.floor(Math.random() * entity.abilities.length)];
+      if (entity.abilities.length > 0 && rng() < 0.3) {
+        const abilityKey = entity.abilities[Math.floor(rng() * entity.abilities.length)];
         if (CombatSystem.useAbility(abilityKey, entity, player)) return;
       }
       CombatSystem.meleeAttack(entity, player);
@@ -168,8 +179,8 @@
 
     // Adjacent — attack (prefer backstab-style abilities)
     if (dist <= 1) {
-      if (entity.abilities.length > 0 && Math.random() < 0.4) {
-        const abilityKey = entity.abilities[Math.floor(Math.random() * entity.abilities.length)];
+      if (entity.abilities.length > 0 && rng() < 0.4) {
+        const abilityKey = entity.abilities[Math.floor(rng() * entity.abilities.length)];
         if (CombatSystem.useAbility(abilityKey, entity, player)) return;
       }
       CombatSystem.meleeAttack(entity, player);
@@ -207,8 +218,8 @@
 
     // Normal combat behavior
     if (dist <= 1) {
-      if (entity.abilities.length > 0 && Math.random() < 0.3) {
-        const abilityKey = entity.abilities[Math.floor(Math.random() * entity.abilities.length)];
+      if (entity.abilities.length > 0 && rng() < 0.3) {
+        const abilityKey = entity.abilities[Math.floor(rng() * entity.abilities.length)];
         if (CombatSystem.useAbility(abilityKey, entity, player)) return;
       }
       CombatSystem.meleeAttack(entity, player);
@@ -230,7 +241,7 @@
     if (tooClose) {
       // Still attack if possible
       if (hasLOS && entity.abilities.length > 0) {
-        const abilityKey = entity.abilities[Math.floor(Math.random() * entity.abilities.length)];
+        const abilityKey = entity.abilities[Math.floor(rng() * entity.abilities.length)];
         CombatSystem.useAbility(abilityKey, entity, player);
       }
       const retreat = findRetreatPosition(entity, player, tiles);
@@ -243,7 +254,7 @@
 
     // In range with LOS — use ranged ability
     if (!tooFar && hasLOS && entity.abilities.length > 0) {
-      const abilityKey = entity.abilities[Math.floor(Math.random() * entity.abilities.length)];
+      const abilityKey = entity.abilities[Math.floor(rng() * entity.abilities.length)];
       if (CombatSystem.useAbility(abilityKey, entity, player)) return;
     }
 
@@ -303,7 +314,7 @@
 
     // Adjacent — power strike or melee
     if (dist <= 1) {
-      if (entity.abilities.includes('power_strike') && entity.stamina >= 20 && Math.random() < 0.5) {
+      if (entity.abilities.includes('power_strike') && entity.stamina >= 20 && rng() < 0.5) {
         CombatSystem.useAbility('power_strike', entity, player);
         return;
       }
@@ -372,7 +383,7 @@
     }
 
     // Chance to telegraph a heavy attack below 50% HP
-    if (hpPct <= 0.5 && Math.random() < 0.2) {
+    if (hpPct <= 0.5 && rng() < 0.2) {
       entity._telegraphing = true;
       GameState.addMessage(`${entity.name} draws a deep breath...`, 'combat');
       if (entity._enraged && player.alive) {
@@ -445,6 +456,9 @@
 
   // ── Public API ────────────────────────────────────────────
   window.AISystem = Object.freeze({
+    // Initialization
+    init,
+
     // Pathfinding
     astar,
     moveToward,

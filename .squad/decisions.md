@@ -4,6 +4,55 @@ Team decisions that all agents must respect.
 
 ---
 
+## Integration Wiring Manifest as Merge Gate (2026-02-27)
+
+**Owner:** Sheldon (Lead Architect)  
+**Status:** ACTIVE  
+**Motivation:** 4 of 9 critical bugs were "never wired" functions—code existed and worked in isolation but was never called from main.js.
+
+### Decision
+
+The `.squad/integration-manifest.md` file documents EVERY required cross-module call in the codebase. It serves as a **mandatory merge gate** for all changes to main.js and any module's public API.
+
+### Process
+
+1. **Before starting:** Check the manifest to understand existing wiring
+2. **While building:** If you add/change a cross-module call, update the manifest immediately (2 minutes)
+3. **Before PR:** Lead (Sheldon) reviews the manifest alongside code review
+4. **Merge gate:** No PR to main branch without manifest update (if applicable)
+
+### Why This Works
+
+- **Prevents "never wired" bugs:** Visible in one place, easy to spot if a function exists but isn't called
+- **Catches missing defensive guards:** Required vs optional integrations are explicit
+- **Forces design clarity:** Cross-module dependencies become visible before coding
+- **Quick review:** Takes 2 minutes to verify 1–2 new rows in the table
+
+### Scope
+
+- ALL cross-module function calls (main.js, combat.js, ai.js, items.js, monsters.js calling each other)
+- Include: lifecycle phase, purpose, status (✅ wired or ❌ missing), and line number
+- Exclude: internal module calls (functions within the same file/module)
+
+### When to Update the Manifest
+
+1. You add a new cross-module call → add a row to the table
+2. You move a call to a different module → update the "Caller Module" or "Callee Module" column
+3. You rename a function used across modules → update the function name in the table
+4. You delete a cross-module call → remove the row
+
+### Example
+
+Adding a new feature where `Renderer.spawnEffect()` is called from `CombatSystem.onKill()`:
+
+```markdown
+| CombatSystem | onKill() | Renderer | spawnEffect(x, y, type) | On kill | Visual feedback on monster death | ✅ Wired | Line 123 |
+```
+
+Update before committing. Takes 30 seconds.
+
+---
+
 ## 1. Shared Data Model & Architecture
 
 **Author:** Sheldon (Lead + Dungeon Generation)  

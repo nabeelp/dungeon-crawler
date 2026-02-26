@@ -59,6 +59,7 @@ A glass cannon with devastating spells but fragile body.
 - **Fireball** — Area-of-effect damage to nearby enemies (costs mana)
 - **Ice Shard** — Ranged attack that slows target (costs mana)
 - **Arcane Shield** — Absorb 30 damage for duration (costs mana)
+- **Arcane Bolt** *(passive)* — When moving toward a visible enemy at range 2–4, the Mage automatically fires a low-damage bolt (50% attack) at no mana cost
 
 ### Rogue
 Fast and deadly; relies on crits and evasion.
@@ -85,6 +86,8 @@ Each class passively regenerates HP, mana, and stamina at different rates per tu
 | Cleric | 2 | 2 | 2 |
 
 Regeneration never exceeds maximum values. A log message appears when resources are restored.
+
+**Post-Combat Cooldown:** Regeneration only lasts for 5 turns after combat ends, then stops. This prevents players from waiting indefinitely between fights to fully heal. Entering a new combat encounter resets the 5-turn regen window.
 
 ### Combat
 Turn-based system with action resolution:
