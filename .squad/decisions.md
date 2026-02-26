@@ -1069,3 +1069,156 @@ After JSON deserialization, `state.player` and the matching entity in `state.ent
 - Cleric can heal between fights; Warrior can War Cry before engaging; Rogue can Evade preemptively
 - README updated to reflect new ability targeting behavior
 
+
+---
+# Decision #15: ItemSystem P0/P1/P2 Bug Fixes
+# Decision: ItemSystem P0/P1/P2 Bug Fixes
+
+**Author:** Raj (Items + Loot)
+**Date:** 2026-02-26
+**Status:** Implemented
+**Files Changed:** `src/items/items.js`, `README.md`
+
+## Context
+
+Leslie's game audit identified several critical and serious issues in the item system. Four were assigned for immediate fix.
+
+## Decisions
+
+### 1. Seeded RNG Storage (P0)
+
+**Decision:** Store the RNG passed to `init(rng)` in a module-scoped `_rng` variable. All internal functions that need randomness use `_rng` instead of `Math.random()`.
+
+**Rationale:** `Math.random()` breaks deterministic replay and seed-based reproducibility. The `init()` function already received the seeded RNG but never stored it. Two functions (`_aoeFireball`, `_scrollTeleport`) were using `Math.random()` directly.
+
+**Fallback:** If `_rng` is null (init not called), creates a fallback RNG via `Utils.createRNG(Date.now())` to avoid crashes. This is a safety net, not intended behavior.
+
+### 2. Inventory Cap — 20 Items (P1)
+
+**Decision:** Hard cap of 20 items in any entity's inventory. Enforced in `pickupItem()`.
+
+**Rationale:** Without a cap, players can hoard unlimited items, breaking game economy and making inventory UI unwieldy. 20 is generous enough for normal play but forces meaningful choices on deeper floors.
+
+**Impact on other agents:**
+- **Howard (UI):** `MAX_INVENTORY_SIZE` is exposed on `ItemSystem` API. Inventory overlay should show "X/20" count.
+- **Leonard (Combat):** No impact — monster loot drops go to ground, not inventory.
+- **Sheldon:** No impact.
+
+### 3. Helmet/Boots/Amulet in TYPE_WEIGHTS (P1)
+
+**Decision:** Added helmet (6%), boots (6%), amulet (6%) to `TYPE_WEIGHTS`. Rebalanced existing weights to keep total at 100. Added switch cases in `_generateSingleItem()`.
+
+**Old weights:** weapon:25, armor:20, potion:25, scroll:15, ring:10, food:5
+**New weights:** weapon:20, armor:16, helmet:6, boots:6, amulet:6, potion:22, scroll:12, ring:8, food:4
+
+**Rationale:** Previously these 3 slot types could only appear via the 30% bonus roll in `generateLoot()`, making them extremely rare (~0.1 per floor). They already had full template arrays. The bonus roll is retained as extra insurance.
+
+### 4. Scroll of Teleport Safety (P2)
+
+**Decision:** Teleport now validates destination: walkable tile + no entity present. Up to 10 retry attempts. Falls back to current position with "The teleport fizzles." message.
+
+**Rationale:** Previously could land player inside walls or on top of monsters, causing softlocks or undefined behavior. Uses `Constants.WALKABLE_TILES` set and `GameState.getEntityAt()` for validation.
+
+## Cross-Agent Notes
+
+- **Howard:** Should display "X/20" inventory count in the inventory overlay. Check `ItemSystem.MAX_INVENTORY_SIZE`.
+- **Amy:** Existing item tests may need updates for the inventory cap check and new TYPE_WEIGHTS. New test cases recommended for: inventory full rejection, teleport fizzle fallback, helmet/boots/amulet drop rates.
+
+---
+# Decision #16: P0/P1 Combat & AI Fixes
+# Decision: P0/P1 Combat & AI Fixes
+
+**Author:** Leonard (Combat + Enemy AI)
+**Date:** 2026-02-27
+**Status:** Implemented
+
+## Context
+
+Leslie's game audit identified several critical issues: Math.random() breaking determinism in combat/AI, DOT kills bypassing onKill() (no XP/loot), free infinite regen enabling wait-to-win, and Mage lacking a ranged basic attack.
+
+## Decisions Made
+
+### 1. Seeded RNG Pattern (P0)
+- **Decision:** Add `init(rng)` to CombatSystem and AISystem following ItemSystem.init pattern. Store module-scoped `_rng` reference. Fallback to `Math.random()` if init not called.
+- **Seed offsets:** CombatSystem uses seed+777, AISystem uses seed+888. Avoids collision with ItemSystem (seed+999), item placement (seed+500), and monsters (seed).
+- **Rationale:** Deterministic RNG is required for save/load replay consistency and fair gameplay.
+
+### 2. DOT Kill onKill() Wiring (P2)
+- **Decision:** Call `onKill(effect.source || null, entity)` when poison/bleed kills. Store `source` entity reference on DOT effects when applied.
+- **Null-safe onKill:** Added `killer &&` guard so DOT kills without tracked source still announce death and drop loot but don't crash.
+- **Alive guard:** Added `entity.alive` check to DOT blocks to prevent double-processing when entity has both poison and bleed.
+- **Rationale:** Previously, poison/bleed kills gave no XP and dropped no loot — making DOT abilities strictly worse than direct damage.
+
+### 3. Regen Cooldown (P1)
+- **Decision:** `regenCooldown` field on player entity. Initialized to 5 on first use. Decremented each EXPLORING turn. Regen only fires when `> 0`. Reset to 5 on COMBAT→EXPLORING transition.
+- **Rationale:** Leslie identified infinite regen as the #1 fun-killer. Players could wait 60 turns to full-heal, trivializing all fights. 5-turn window provides meaningful post-combat recovery without enabling exploitation.
+- **Alternative rejected:** Hunger/food clock — too complex for the fix needed.
+
+### 4. Mage Arcane Bolt (P1)
+- **Decision:** Data-driven ranged attack via `rangedAttack: { range: 4, damageMultiplier: 0.5 }` on MAGE class in constants.js. Generic handling in meleeAttack() checks class definition. Auto-fire scan in tryMove() looks along movement direction.
+- **Damage:** 50% of base damage formula. Costs 0 mana. Requires LOS.
+- **Range:** 2–4 tiles (scan starts at 2 to avoid free melee attacks on adjacent enemies).
+- **Rationale:** Mage with 60 HP forced into melee breaks class fantasy. Arcane Bolt gives basic ranged poke without obsoleting Ice Shard/Fireball.
+
+## Files Changed
+
+| File | Changes |
+|------|---------|
+| `src/systems/combat.js` | init(rng), rng() helper, DOT onKill, null-safe onKill, ranged attack in meleeAttack, regen cooldown in regenerate |
+| `src/systems/ai.js` | init(rng), rng() helper, all 10 Math.random() replaced |
+| `src/core/constants.js` | MAGE.rangedAttack property added |
+| `src/main.js` | CombatSystem/AISystem init wiring (new game + load), regen cooldown reset in checkCombatPhase, auto-ranged scan in tryMove |
+| `README.md` | Mage Arcane Bolt documented, regen cooldown note added |
+
+## Integration Notes
+
+- **Howard:** No changes needed. Auto-ranged attack messages go through existing `postAttackMsg()` → `GameState.addMessage()` pipeline.
+- **Amy:** New test cases recommended: (1) DOT kill awards XP, (2) regen stops after 5 turns, (3) Arcane Bolt fires at range 2-4, (4) RNG determinism with seeded init.
+- **Sheldon:** `regenCooldown` is a plain numeric field on the player entity — survives JSON serialization automatically.
+
+---
+# Decision #17: P0/P1/P2 Rendering & UI Fixes
+# Howard — P0/P1/P2 Fix Sprint
+
+**Author:** Howard (Rendering + Fog of War)  
+**Date:** 2026-02-26  
+**Status:** Complete  
+
+## Changes
+
+### 1. Diagonal Movement (P1) — `src/main.js`
+
+Added 8-way player movement to match monster movement:
+
+- **Numpad keys** (via `e.code` to avoid conflict with ability hotkeys 1-9): Numpad 7/8/9/4/6/1/2/3 for all 8 directions. Numpad 5 = wait.
+- **Vi-keys** (via `e.key`): Y = up-left, U = up-right, B = down-left, N = down-right.
+- Existing WASD/Arrow movement unchanged.
+- All movement goes through `tryMove()` — same walkable checks, bump-combat, trap triggers, ground item notifications.
+
+**Key design decision:** Numpad keys are dispatched before the `moveMap`/ability check by using `e.code` (e.g. `'Numpad1'`) instead of `e.key` (which would be `'1'`, conflicting with ability slot 1). This keeps top-row 1-9 for abilities and numpad 1-9 for movement.
+
+### 2. Distance Function Mismatch (P0) — `src/main.js`
+
+`tryAbility()` was using `Utils.manhattanDist` to find nearest enemy, while `checkCombatPhase()` and AI use `Utils.chebyshevDist`. Changed to `chebyshevDist`.
+
+**Impact:** Manhattan distance overcounts diagonal distance (2 diagonal tiles = manhattan 4 vs chebyshev 2). This caused abilities to sometimes target wrong enemies or fail to find valid targets that were within FOV range.
+
+### 3. Score Formula (P2) — `src/ui/hud.js`
+
+Old formula: `floor*100 + level*50 + xp + turns` (turns as positive term = slow play rewarded).
+
+New formula: `max(0, floor*100 + level*50 + xp - floor(turns/10))`. Turn penalty is gentle (1 point per 10 turns) but directionally correct.
+
+### 4. Documentation Updates
+
+- **README.md:** Controls table split Move into cardinal/diagonal rows.
+- **hud.js help screen:** Added diagonal movement line.
+- **hud.js title screen:** Updated controls quick-reference.
+
+## Files Changed
+
+- `src/main.js` — diagonal input handling, distance function fix
+- `src/ui/hud.js` — score formula, help screen, title screen controls
+- `README.md` — controls table
+- `.squad/agents/howard/history.md` — session log
+
