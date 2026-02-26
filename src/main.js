@@ -104,6 +104,12 @@
     GameState.addEntity(player);
     GameState.setPlayer(player);
 
+    // Initialize item identification system before any items are generated
+    if (window.ItemSystem && ItemSystem.init) {
+      const idRng = Utils.createRNG(GameState.state.seed + 999);
+      ItemSystem.init(idRng);
+    }
+
     // Spawn monsters if MonsterFactory is available
     if (window.MonsterFactory && MonsterFactory.spawnForFloor) {
       const rng = Utils.createRNG(GameState.state.seed);
@@ -156,6 +162,17 @@
       // Check combat phase
       checkCombatPhase();
 
+      // Tick buff/debuff timers for all entities on the current floor
+      if (window.ItemSystem && ItemSystem.tickBuffs) {
+        ItemSystem.tickBuffs(player);
+        const floorEntities = GameState.getEntitiesOnFloor(GameState.getCurrentFloor());
+        for (const ent of floorEntities) {
+          if (ent.type !== 'player' && ent.alive) {
+            ItemSystem.tickBuffs(ent);
+          }
+        }
+      }
+
       // Class-based resource regeneration (exploring only)
       if (window.CombatSystem && CombatSystem.regenerate) {
         CombatSystem.regenerate(player);
@@ -189,10 +206,7 @@
       // Attack the monster
       if (window.CombatSystem && CombatSystem.meleeAttack) {
         CombatSystem.meleeAttack(player, target);
-        if (!target.alive) {
-          player.xp += (target.level || 1) * 10;
-          checkLevelUp(player);
-        }
+        // XP and level-up handled by CombatSystem.onKill()
       } else {
         // Fallback: simple damage
         const dmg = Math.max(1, player.attack - target.defense);
@@ -431,6 +445,7 @@
 
     try {
       const state = GameState.state;
+      const idState = window.ItemSystem && ItemSystem.getIdentificationState ? ItemSystem.getIdentificationState() : null;
       const saveData = {
         phase: state.phase,
         currentFloor: state.currentFloor,
@@ -440,7 +455,8 @@
         entities: state.entities,
         player: state.player,
         groundItems: state.groundItems,
-        messages: state.messages.slice(0, 50)
+        messages: state.messages.slice(0, 50),
+        identificationState: idState
       };
       localStorage.setItem('dc_save', JSON.stringify(saveData));
     } catch (e) {
@@ -483,6 +499,11 @@
       state.player = data.player || null;
       state.groundItems = data.groundItems || [];
       state.messages = data.messages || [];
+
+      // Restore item identification state
+      if (data.identificationState && window.ItemSystem && ItemSystem.restoreIdentificationState) {
+        ItemSystem.restoreIdentificationState(data.identificationState);
+      }
 
       return true;
     } catch (e) {

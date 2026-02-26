@@ -85,3 +85,9 @@
 ### Integration Notes for Howard
 - Priority: (1) Wire ItemSystem.init() on new game, (2) Add ItemSystem.tickBuffs() call per turn, (3) Implement save/load state persistence for buffs/enraged/telegraphing/summons, (4) Fix double XP removal from main.js
 - Next: Expand combat phase threshold; implement inventory cap; fix score formula
+
+### Bug Fixes Applied (2026-02-26)
+- **Bug #1 — Double XP removed:** Removed `player.xp += ...` and `checkLevelUp()` from `tryMove()` in main.js after CombatSystem.meleeAttack kills a target. CombatSystem.onKill() already handles XP award and leveling with proper formula. Kept the fallback path (no CombatSystem loaded) unchanged since it's the only XP path in that case.
+- **Bug #3 — ItemSystem.init() wired:** Added `ItemSystem.init(idRng)` call in `startNewGame()` after `GameState.newGame()` and before monster/item spawning. Uses seed offset +999 to avoid colliding with other RNG streams.
+- **Bug #5 — tickBuffs() wired per turn:** Added `ItemSystem.tickBuffs()` calls in `processPlayerAction()` after enemy turns. Ticks player first, then all alive non-player entities on the current floor. Placed before regeneration to ensure buff expiry happens before regen.
+- **Bug #6 — Save/Load identification state:** Added `identificationState` field to save data (via `ItemSystem.getIdentificationState()` guard). On load, restores via `ItemSystem.restoreIdentificationState()` guard. Both use defensive `window.ItemSystem && method` checks so they degrade gracefully if Sheldon's API additions aren't merged yet.
