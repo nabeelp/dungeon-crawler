@@ -91,3 +91,33 @@
 - **Scope:** All 6 critical bugs resolved
 - **Test coverage:** 17 new regression tests added across combat, items, save/load
 - **Status:** All tests passing; decision docs merged into decisions.md
+
+## Design Review (2026-02-27)
+
+### Ceremony: Comprehensive Design Review
+
+- **Requested by:** Nabeel
+- **Scope:** Full architecture and game design review of all 14 source files
+- **Verdict:** B+ overall architecture
+
+### Critical Bugs Found
+
+1. **Save/Load Duplicate Player Object (main.js:497-499)** — After JSON round-trip, `state.player` and the player entry in `state.entities` become separate objects. Player movement updates one copy but not the other, silently corrupting post-load gameplay. Fix: point `state.player` at the entity found in `state.entities` after deserialization.
+
+2. **Self-Targeting Abilities Blocked (main.js:351-372)** — `tryAbility()` refuses to fire ANY ability if no enemy is in FOV range. This blocks Cleric heal, Warrior War Cry, Rogue Evade, and Mage Arcane Shield outside of combat. Fix: check ability type and allow self/party abilities without a target.
+
+3. **Duplicate checkLevelUp() (main.js:395-406 vs combat.js:303-319)** — Two different level-up functions with inconsistent stat gains. The main.js version gives +2 ATK and full heal; combat.js gives +1 ATK and partial heal. Fix: remove the dead fallback path in main.js.
+
+### Serious Issues Found
+
+4. **Unseeded Math.random()** used in combat.js:137, ai.js (7 locations), items.js:199/213-214 — Breaks the seeded-PRNG architecture decision.
+5. **4-way player movement vs 8-way monster movement** — Players can only move cardinally but monsters move diagonally.
+6. **Distance metric mismatch** — tryAbility uses manhattanDist but combat uses chebyshevDist for range checks.
+
+### Architecture Notes
+
+- Module dependency graph: clean, no circular dependencies
+- Two encapsulation violations: renderer directly accesses `GameState.state.groundItems`, `loadGame()` bypasses accessors
+- Dead code: TILES.WATER never used, main.js fallback combat path unreachable
+- Boss difficulty (Dragon Lord) potentially overtuned: 470 HP + enrage + minions vs ~230 HP player
+- Written full findings to `.squad/decisions/inbox/sheldon-design-review.md`

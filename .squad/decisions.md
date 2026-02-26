@@ -654,3 +654,101 @@ Comprehensive review of all 14 source files identified 6 critical bugs, 7 seriou
 - **Test coverage:** 100% of bug fixes verified
 - **Game systems:** Combat, items, save/load, entity persistence all working correctly
 - **Next priorities:** Address 7 serious issues (Math.random, armor rarity, combat threshold, self-targeting, AoE friendlies, inventory cap, teleport safety)
+
+---
+
+## 8. Design Review — Comprehensive Architecture & Game Assessment
+
+**Author:** Sheldon (Lead + Dungeon Generation)  
+**Date:** 2026-02-27  
+**Ceremony:** Design Review  
+**Requested by:** Nabeel  
+**Status:** Completed  
+
+### Executive Summary
+
+The dungeon crawler has matured significantly. The architecture is clean — no circular dependencies, well-separated modules, clear data flow. This review surfaced **3 critical bugs**, **3 serious issues**, and several quality improvements. The most dangerous: a save/load bug creating a split-brain player object, making post-load gameplay silently corrupt.
+
+### Architecture Health — ✅ Grade: B+
+
+**Module Dependency Graph — Clean**
+- No circular dependencies
+- Load order in `index.html` correct and matches dependency graph
+- IIFE + `window.*` pattern enforces clean boundaries
+
+**Encapsulation Issues (2)**
+1. Renderer directly accesses `GameState.state.groundItems` (bypass to public API)
+2. `loadGame()` directly mutates `GameState.state` (no accessor use)
+
+**Dead Code**
+- `TILES.WATER` (value 6) — Defined but never generated or used
+- `main.js:checkLevelUp()` (lines 395-406) — Duplicate of `CombatSystem.checkLevelUp()` with DIFFERENT stat values and dead code path
+
+### Critical Bugs (3) — Must Fix
+
+**Bug #1: Save/Load Creates Duplicate Player Object** (`main.js:497-499`)
+- After JSON deserialize, `state.player` and `state.entities[player]` are separate objects
+- Post-load: movement updates wrong object, combat/FOV/rendering use inconsistent references
+- **Impact:** Silent corruption post-load
+- **Fix:** After restore, point `state.player` at entity in `state.entities`
+
+**Bug #2: Self-Targeting Abilities Blocked Without Enemies** (`main.js:351-372`)
+- `tryAbility()` refuses to fire ANY ability if no enemy in FOV range
+- Affects Cleric heal, Warrior war cry, Rogue evade, Mage arcane shield, Cleric divine shield
+- **Impact:** Cripples class viability between combats
+- **Fix:** Check ability type; if `self` or `party`, call without target requirement
+
+**Bug #3: Duplicate Level-Up Logic with Different Stat Values** (`main.js:395-406` vs `combat.js:303-319`)
+
+| Stat | main.js (fallback) | combat.js (primary) |
+|------|-------------------|---------------------|
+| maxHp | +10 | +10 |
+| hp | full heal | +10 (partial) |
+| mana | unchanged | +3 |
+| stamina | unchanged | +3 |
+| attack | +2 | +1 |
+| defense | +1 | +1 |
+
+- Code is unreachable (fallback path never triggered), but dangerous dead code
+- **Fix:** Remove fallback `checkLevelUp()` and fallback combat path from `main.js`
+
+### Serious Issues (3) — Should Fix
+
+1. **Unseeded Math.random()** — Combat damage variance, AI ability selection, item effects, trap damage all use unsueded random. Breaks reproducibility and seeded-PRNG architecture.
+
+2. **4-Way vs 8-Way Movement Imbalance** — Player 4-cardinal (WASD), monsters 8-directional with chebyshev distance. Monsters can cut corners; players cannot. Asymmetric tactical advantage.
+
+3. **Distance Metric Mismatch** — `tryAbility()` uses manhattan distance to find target, but combat checks use chebyshev distance. Wrong enemy selected as "nearest."
+
+### Nice-to-Haves (8)
+
+1. Scroll of Fireball bypasses `CombatSystem.onKill()` — no XP/loot awarded
+2. Scroll of Teleport no collision check — can land on entity
+3. Monster spawn density on deep floors — small rooms give few x positions
+4. Boss difficulty potentially overtuned — Floor 10 Dragon Lord 470 HP, may require legendary gear
+5. No monster HP display
+6. No ability cooldown/cost display during gameplay
+7. Message log too short (5 messages) — combat scrolls off
+8. No inventory size limit
+
+### Action Items (Prioritized)
+
+| # | Issue | Severity | Owner | Fix |
+|---|-------|----------|-------|-----|
+| 1 | Save/Load duplicate player reference | 🔴 Must | Sheldon/Howard | Point `state.player` at entity in `state.entities` |
+| 2 | Self-targeting abilities blocked | 🔴 Must | Howard | Check ability type before requiring target |
+| 3 | Dead/duplicate checkLevelUp | 🔴 Must | Howard | Remove fallback combat path and level-up |
+| 4 | Unseeded Math.random in combat/AI/items | 🟡 Should | Leonard/Raj/Howard | Pass seeded RNG throughout |
+| 5 | 4-way vs 8-way movement imbalance | 🟡 Should | Howard | Add diagonal movement keys |
+| 6 | Distance metric mismatch | 🟡 Should | Howard | Change manhattanDist → chebyshevDist |
+| 7 | Scroll of Fireball XP/loot | 🟢 Nice | Raj | Route kills through CombatSystem |
+| 8 | Scroll of Teleport collision | 🟢 Nice | Raj | Check destination for entity |
+| 9 | Boss difficulty tuning | 🟢 Nice | Leonard | Tune scaling or guarantee legendary by floor 8 |
+| 10 | Message log length | 🟢 Nice | Howard | Increase to 8-10 or add scroll-back |
+| 11 | Remove TILES.WATER | 🟢 Nice | Sheldon | Remove or implement water |
+
+### Verdict
+
+Clean module architecture with no circular deps, clear ownership, and frozen public APIs. IIFE pattern is simple and effective. The biggest structural risk: `GameState.state` exposed as mutable reference, directly causing Critical Bug #1. Game is playable and fun, but three critical bugs cause real player frustration (especially save/load corruption and self-heal blocking). **Recommend targeted bug-fix sprint for items #1-#3 before any new feature work.**
+
+— Sheldon, Lead Architect
