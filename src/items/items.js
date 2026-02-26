@@ -208,6 +208,9 @@
         if (e.hp <= 0) {
           e.alive = false;
           GameState.addMessage(`${e.name} is incinerated!`, 'combat');
+          if (window.CombatSystem && CombatSystem.onKill) {
+            CombatSystem.onKill(entity, e);
+          }
         }
       }
     }

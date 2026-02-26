@@ -125,3 +125,14 @@
 ### Weight Rebalancing Detail
 Old: weapon:25, armor:20, potion:25, scroll:15, ring:10, food:5 (total:100)
 New: weapon:20, armor:16, helmet:6, boots:6, amulet:6, potion:22, scroll:12, ring:8, food:4 (total:100)
+
+## Critical Bug Fix — Scroll of Fireball onKill (2026-02-26)
+
+### Problem
+`_aoeFireball()` in items.js set `e.alive = false` when AoE fire damage killed an enemy, but never called `CombatSystem.onKill()`. Kills from Scroll of Fireball awarded no XP and dropped no loot.
+
+### Fix
+Added `window.CombatSystem && CombatSystem.onKill && CombatSystem.onKill(entity, e)` after the kill in `_aoeFireball()`, mirroring the pattern used in `combat.js:aoeAttack()`. The guard ensures no crash if CombatSystem hasn't loaded yet.
+
+### Audit
+Full grep of items.js confirmed this was the **only** site where `alive = false` is set. No other scroll effects, potion effects, or damage-dealing items directly kill entities — `_aoeFireball()` was the sole offender.
