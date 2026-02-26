@@ -121,3 +121,24 @@
 - Dead code: TILES.WATER never used, main.js fallback combat path unreachable
 - Boss difficulty (Dragon Lord) potentially overtuned: 470 HP + enrage + minions vs ~230 HP player
 - Written full findings to `.squad/decisions/inbox/sheldon-design-review.md`
+
+## Retrospective (2026-02-27)
+
+### Key Findings
+- **9 critical bugs shipped in initial build** despite 85 passing tests. All were integration-layer failures (missing wiring, data model gaps, duplicate logic) invisible to unit tests.
+- **"Never wired" pattern was the #1 failure mode:** 4 of 10 critical bugs were functions that existed and worked but were never called from main.js (init, dropLoot, tickBuffs, processTurnStart).
+- **Parallel fan-out without integration gates** caused the bugs. Architecture defined interfaces but not wiring contracts (who calls what, when).
+- **Defensive coding (`window.X && X.method`) masked failures** instead of surfacing them. Silent degradation hid missing integrations.
+- **Adding Leslie (Critic) was the highest-impact change.** One critic review found more critical bugs than five builder sessions. Critic review is now a mandatory gate.
+- **Root causes:** No integration tests, no code review before merge, informal/additive entity schema, no wiring manifest.
+
+### Process Changes Committed
+1. Integration wiring manifest required for all cross-module calls
+2. Mandatory code review before merge (Lead reviews main.js changes)
+3. Integration tests verifying actual wiring (not just module correctness)
+4. Critic review as standard gate before milestones
+5. Fail loudly on required integrations — ban silent guards for required calls
+6. Centralize entity/item schema — no ad-hoc field additions outside factories
+
+### Retrospective Document
+- Written to `.squad/decisions/inbox/sheldon-retrospective.md`

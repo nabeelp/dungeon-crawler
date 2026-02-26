@@ -579,7 +579,80 @@ Comprehensive review of all 14 source files identified 6 critical bugs, 7 seriou
 
 ---
 
-## 13. Bug Fix Sprint: Leslie's 6 Critical Fixes
+## 13. Retrospective: Root Cause Analysis & Process Improvements
+
+**Facilitators:** Sheldon (Lead), Leslie (Critic)  
+**Date:** 2026-02-27  
+**Type:** Ceremony — Retrospective  
+**Scope:** Full project lifecycle — Phases 1 through 8  
+**Team:** Sheldon (Lead), Leonard (Combat), Howard (Rendering), Raj (Items), Amy (Tester), Leslie (Critic)  
+**Status:** COMPLETE
+
+### Executive Summary
+
+We built a complete, playable roguelike with five agents shipping 14 source files, 130+ tests, and ~20 features in one sprint. However, we shipped **9 critical bugs** that were all **integration wiring gaps**, not module-level defects. Root cause: no integration testing, no integration contracts, parallel fan-out without gates, defensive coding that masked failures, and no code review before merge.
+
+### Root Causes
+
+1. **No integration testing.** 85 unit tests validated modules in isolation. Zero tests validated cross-module calls (e.g., "Is `ItemSystem.init()` actually called?", "Does the game loop call `tickBuffs()` every turn?").
+
+2. **Parallel fan-out without integration gates.** Five agents built five systems simultaneously. Each validated their own module. Nobody was responsible for verifying wiring between modules. Howard's main.js used `window.X && X.method()` guards that silently swallowed missing calls instead of failing loudly.
+
+3. **Entity schema was additive and informal.** Base schema defined in `createEntity()`, but statusEffects, tags, xpValue, _buffs were added ad-hoc downstream. When save/load serialized, all ad-hoc fields vanished.
+
+4. **No code review before merge.** Phases 1–5 had zero review gates. Five agents wrote code, Amy tested in isolation, all merged.
+
+5. **Duplicate logic.** XP awarded in two places; checkLevelUp called twice with inconsistent stat gains; duplicate boss phase conditions.
+
+### The 9 Critical Bugs (All Integration Gaps)
+
+| Pattern | Bugs | Count |
+|---------|------|-------|
+| **Never wired** — function exists but never called from game loop | init(), dropLoot(), tickBuffs(), processTurnStart(player) | 4 |
+| **Data model gaps** — fields added outside factories, lost on serialization | createItem custom fields, entity schema, split-brain player, save/load field loss | 4 |
+| **Duplicate logic** — same responsibility implemented twice, inconsistently | double XP, duplicate checkLevelUp | 1 |
+
+### What Went Well
+
+- **Architecture:** IIFE module pattern, frozen interfaces, clean ownership. No circular deps.
+- **Individual module quality:** Combat, dungeon gen, FOV, items — all well-implemented.
+- **The Critic role:** Leslie found 6 criticals in one session that the team missed across five sessions. Leslie's counter-review found a 7th (player status effects never tick).
+- **Response velocity:** Once bugs were identified, all fixed same day with comprehensive regression tests.
+
+### Mandatory Process Changes (Non-Negotiable)
+
+**P0: Integration Wiring Manifest**  
+Document explicitly listing every cross-module call in main.js, with caller, callee, and lifecycle phase (init, per-turn, on-event, save, load). If it's not in the manifest, it's not wired.
+
+**P0: Mandatory Code Review Before Merge**  
+No code ships without at least one other agent reading it. For main.js (the integration point), the Lead must review every change.
+
+**P0: Fail Loudly, Not Silently**  
+Ban `window.X && X.method()` for required integrations. If `ItemSystem.init()` must be called, call it without a guard. Reserve defensive guards only for genuinely optional features.
+
+**P0: Integration Tests**  
+After startNewGame(), verify ItemSystem._idMap is populated. After processPlayerAction(), verify player buffs ticked. After monster death, verify dropLoot was called. These tests run the game loop, not individual modules.
+
+**P0: Keep the Critic**  
+Leslie's role pays for itself. Critic review is a standard gate before any release or major milestone. Add critic earlier — not after the build is declared complete.
+
+### Leslie's 5 Non-Negotiable Demands
+
+1. **Integration tests before "done"** — At least one test per public API verifying caller→callee path.
+2. **No graceful degradation in development** — `DEV_MODE` flag. In dev, replace guards with hard assertions: `if (!window.ItemSystem) throw new Error("ItemSystem not loaded");`
+3. **Critic reviews before "done," not after** — No ceremony can declare a build complete without Critic sign-off on integration.
+4. **Decision documents are checklists** — Checklist of wiring verification for every decision with integration notes. All boxes checked before merge.
+5. **20% integration test coverage minimum** — At least 20% of test suite must be cross-module scenarios.
+
+### Overall Grade
+
+**B-** (Leslie's assessment, accepted by Sheldon)
+
+The game works. The process needs improvement.
+
+---
+
+## 14. Bug Fix Sprint: Leslie's 6 Critical Fixes
 
 **Author:** Sheldon (Lead), Leonard (Combat), Howard (Rendering), Amy (Tester)  
 **Date:** 2026-02-26  
