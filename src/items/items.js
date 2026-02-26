@@ -9,7 +9,13 @@
 (function () {
   'use strict';
 
-  const { ITEM_TYPES, EQUIPMENT_SLOTS, ITEM_RARITIES } = Constants;
+  const { ITEM_TYPES, EQUIPMENT_SLOTS, ITEM_RARITIES, WALKABLE_TILES } = Constants;
+
+  // Maximum number of items an entity can carry
+  const MAX_INVENTORY_SIZE = 20;
+
+  // Module-scoped seeded RNG, stored by init()
+  let _rng = null;
 
   // ── Item Templates Database ─────────────────────────────────
   // Each template: { name, type, slot?, rarity, statMods, description }
@@ -196,7 +202,7 @@
     for (const e of entities) {
       if (e.id === entity.id) continue;
       if (Utils.chebyshevDist(entity.x, entity.y, e.x, e.y) <= 3) {
-        const dmg = 15 + Math.floor(Math.random() * 10);
+        const dmg = 15 + Math.floor((_rng || Utils.createRNG(Date.now())).random() * 10);
         e.hp -= dmg;
         GameState.addMessage(`${e.name} takes ${dmg} fire damage!`, 'combat');
         if (e.hp <= 0) {
@@ -210,9 +216,25 @@
   function _scrollTeleport(entity) {
     const fd = GameState.getFloorData(entity.floor);
     if (!fd || !fd.rooms || fd.rooms.length === 0) return;
-    const room = fd.rooms[Math.floor(Math.random() * fd.rooms.length)];
-    entity.x = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
-    entity.y = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
+    const rng = _rng || Utils.createRNG(Date.now());
+
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const room = fd.rooms[Math.floor(rng.random() * fd.rooms.length)];
+      const nx = room.x + 1 + Math.floor(rng.random() * (room.w - 2));
+      const ny = room.y + 1 + Math.floor(rng.random() * (room.h - 2));
+
+      // Verify walkable tile and no entity collision
+      const tile = fd.tiles && fd.tiles[ny] && fd.tiles[ny][nx];
+      if (tile !== undefined && WALKABLE_TILES.has(tile) &&
+          !GameState.getEntityAt(nx, ny, entity.floor)) {
+        entity.x = nx;
+        entity.y = ny;
+        return;
+      }
+    }
+
+    // All attempts failed — fizzle
+    GameState.addMessage('The teleport fizzles.', 'system');
   }
 
   function _scrollIdentify(entity) {
@@ -292,7 +314,7 @@
   ];
 
   const TYPE_WEIGHTS = {
-    weapon: 25, armor: 20, potion: 25, scroll: 15, ring: 10, food: 5
+    weapon: 20, armor: 16, helmet: 6, boots: 6, amulet: 6, potion: 22, scroll: 12, ring: 8, food: 4
   };
 
   // ── Weighted Random Selection ───────────────────────────────
@@ -434,9 +456,11 @@
     switch (typeKey) {
       case 'weapon':
       case 'armor':
-        return _generateEquipItem(typeKey, rarity, floorIndex, rng);
+      case 'helmet':
+      case 'boots':
       case 'ring':
-        return _generateEquipItem('ring', rarity, floorIndex, rng);
+      case 'amulet':
+        return _generateEquipItem(typeKey, rarity, floorIndex, rng);
       case 'potion':
         return _generatePotion(rarity, floorIndex, rng);
       case 'scroll':
@@ -508,6 +532,10 @@
    * Pick up an item from the ground into entity's inventory.
    */
   function pickupItem(entity, item) {
+    if (entity.inventory.length >= MAX_INVENTORY_SIZE) {
+      GameState.addMessage("Your inventory is full! Drop something first.", 'system');
+      return false;
+    }
     GameState.removeGroundItem(item.id);
     item.x = null;
     item.y = null;
@@ -727,6 +755,7 @@
    * @param {object} rng - seeded RNG
    */
   function init(rng) {
+    _rng = rng;
     _initIdentificationMaps(rng);
   }
 
@@ -757,6 +786,9 @@
   window.ItemSystem = Object.freeze({
     // Initialization
     init,
+
+    // Constants
+    MAX_INVENTORY_SIZE,
 
     // Identification state (save/load)
     getIdentificationState,

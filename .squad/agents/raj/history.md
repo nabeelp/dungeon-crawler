@@ -96,3 +96,32 @@
 - Priority: (1) Ensure createItem preserves _defKey and custom properties, (2) Save/restore _identifiedKeys and potion/scroll identification state in save/load, (3) Implement ItemSystem state serialization
 - Blocking: Leonard needs ItemSystem.dropLoot() wired; tickBuffs() called per turn; init() called on new game
 - Next: Add helmets/boots/amulets to TYPE_WEIGHTS; validate Scroll of Teleport destination
+
+## P0/P1/P2 Bug Fixes (2026-02-26)
+
+### Changes Made to `src/items/items.js`
+
+1. **P0 — Replaced all Math.random() with seeded RNG**
+   - Added module-scoped `_rng` variable, stored during `init(rng)`.
+   - `_aoeFireball()` and `_scrollTeleport()` now use `_rng` (with `Utils.createRNG(Date.now())` fallback if init wasn't called).
+   - Zero remaining `Math.random()` calls in items.js. All randomness is now deterministic/reproducible.
+
+2. **P1 — Inventory cap: 20 items max**
+   - Added `MAX_INVENTORY_SIZE = 20` constant.
+   - `pickupItem()` checks `entity.inventory.length >= MAX_INVENTORY_SIZE` before adding; returns false with "Your inventory is full! Drop something first." message if full.
+   - Exposed `MAX_INVENTORY_SIZE` on the public `ItemSystem` API for UI reference.
+   - Updated README.md with inventory cap info.
+
+3. **P1 — Helmet/boots/amulet now drop normally**
+   - Added `helmet: 6`, `boots: 6`, `amulet: 6` to `TYPE_WEIGHTS` (rebalanced other weights to keep total at 100).
+   - Added `helmet`, `boots`, `amulet` cases to `_generateSingleItem()` switch — they route through `_generateEquipItem()` which already handles all equipment types.
+   - The 30% bonus roll in `generateLoot()` remains as extra insurance.
+
+4. **P2 — Scroll of Teleport now validates destination**
+   - After picking a random room position, verifies tile is walkable (`WALKABLE_TILES.has(tile)`) and no entity exists there (`GameState.getEntityAt()`).
+   - Retries up to 10 attempts on invalid positions.
+   - Falls back to current position with "The teleport fizzles." message if all attempts fail.
+
+### Weight Rebalancing Detail
+Old: weapon:25, armor:20, potion:25, scroll:15, ring:10, food:5 (total:100)
+New: weapon:20, armor:16, helmet:6, boots:6, amulet:6, potion:22, scroll:12, ring:8, food:4 (total:100)
