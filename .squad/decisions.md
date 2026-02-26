@@ -840,6 +840,64 @@ The dungeon crawler has matured significantly. The architecture is clean — no 
 
 2. **4-Way vs 8-Way Movement Imbalance** — Player 4-cardinal (WASD), monsters 8-directional with chebyshev distance. Monsters can cut corners; players cannot. Asymmetric tactical advantage.
 
+---
+
+## Design Review: Post-P0/P1 Verification (2026-02-27)
+
+**Date:** 2026-02-27  
+**Ceremony:** Design Review Post-P0/P1 Bug Fix Round  
+**Grade:** B (upgraded from B-)  
+**Status:** Technically shippable with one critical fix
+
+### Overview
+
+All 6 agents completed design review and verification of P0/P1 fixes. 10 of 11 fixes confirmed correct. 1 critical issue identified (Scroll Fireball kills bypass onKill). 5 serious issues deferred to post-ship. Integration health stable. Ship-ready with Fireball fix.
+
+### Agent Findings
+
+**Sheldon (Lead):**
+- 10 of 11 P0/P1 fixes verified correct and merged
+- Integration health: **good**
+- 1 new P1 issue discovered: Scroll of Fireball kills bypass `onKill()` in items.js
+- Recommendation: Ship-ready with one fix
+
+**Leslie (Critic):**
+- Grade upgraded B- → **B**
+- 1 critical issue remains: Scroll Fireball kills bypass onKill hooks
+- 5 serious issues deferred (combat phase threshold, regenCooldown not saved, effect.source serialization, dead fallback code, boss telegraph kills)
+- Rationale: 10/11 fixes correct, 1 critical blocks full integration, 5 serious are known and isolated
+
+### Critical Issue
+
+**Scroll of Fireball kills bypass onKill() hooks** (items.js:208-210)
+- Users can kill bosses with scroll effects, eliminating state cleanup
+- No XP awarded, no loot drops
+- Impact: Isolated to items.js, known scope, low fix effort
+- Fix: Route kills through `CombatSystem.onKill()` (~5 lines, same pattern as combat.js:306)
+
+### Serious Issues (Deferred to Post-Ship)
+
+1. **Combat phase threshold too tight** (dist≤2 vs ranged enemies at dist 6) — Ranged monsters shoot while player regenerates
+2. **regenCooldown not persisted on save/load** — Players can save-scum for infinite regen via reloads
+3. **effect.source serialization in combat log** — DOT kills after load pass stale object to onKill()
+4. **Dead fallback code in inventory** (main.js:383-387) — tryPickup bypasses MAX_INVENTORY_SIZE if ItemSystem doesn't exist
+5. **Boss telegraph kills miss onKill hooks** (ai.js:369-372) — No death-related cleanup on telegraphed kills
+
+### Integration Health
+
+✓ No new conflicts  
+✓ All agent work stable  
+✓ Test suites passing  
+✓ 29 integration tests covering wiring  
+✓ 62-row integration manifest (all ✅)  
+
+### Decision
+
+**Ship with Grade B.** Fix Scroll Fireball kills in items.js, re-verify with test suite, merge to main, and ship. Open post-ship tracking for 5 serious issues.
+
+Sheldon: "Ship-ready with one fix."  
+Leslie: "B grade, technically shippable."
+
 3. **Distance Metric Mismatch** — `tryAbility()` uses manhattan distance to find target, but combat checks use chebyshev distance. Wrong enemy selected as "nearest."
 
 ### Nice-to-Haves (8)
