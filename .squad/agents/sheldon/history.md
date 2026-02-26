@@ -142,3 +142,31 @@
 
 ### Retrospective Document
 - Written to `.squad/decisions/inbox/sheldon-retrospective.md`
+
+## Design Review #2 (2026-02-27)
+
+### Ceremony: Design Review
+- **Scope:** Architecture health, dungeon gen, cross-module integration, code quality
+- **Verdict:** B+ maintained. Previous critical bugs (duplicate player ref, self-targeting, duplicate checkLevelUp) were fixed. Remaining issues are Minor/Major severity.
+
+### Issues Found
+1. **[Major] Trap RNG uses Date.now() seed** — main.js:268. `Utils.createRNG(Date.now())` creates a new unseeded-quality RNG per trap. Breaks determinism and will produce similar damage on rapid successive traps.
+2. **[Major] Monster spawn randInt on small rooms** — monsters.js:188-189. `randInt(room.x+1, room.x+room.w-2)` requires w≥4. FLOOR_PARAMS guarantees minRoomSize≥4, so currently safe, but no defensive guard if room sizing changes.
+3. **[Minor] Math.random() fallback in combat/AI** — combat.js:34, ai.js:21. Fallback `Math.random()` only fires if init() wasn't called. Init is wired, so low risk, but violates "fail loudly" policy.
+4. **[Minor] Renderer Math.random() for shake** — renderer.js:99-100. Acceptable for visual-only effect (no gameplay impact).
+5. **[Minor] TILES.WATER defined but never generated** — constants.js:19, renderer.js:23 has color. Dead code.
+6. **[Minor] Renderer accesses GameState.state.groundItems directly** — renderer.js:212. Encapsulation violation, but functional.
+
+### What's Working Well
+- BSP generator produces clean, connected dungeons across all 10 floors
+- Integration manifest is comprehensive and accurate (73 entries, all ✅)
+- Save/load re-links player reference correctly (line 540-544)
+- Self-targeting abilities now properly handled (line 387-393)
+- Single checkLevelUp in combat.js only (main.js duplicate removed)
+- Module load order is correct; bootstrap verifies all 12 modules
+
+## Arcane Bolt Fog Check Fix (2026-02-27)
+
+- **Bug:** Mage's auto-ranged Arcane Bolt (main.js:247-264) scanned tiles in the movement direction and attacked enemies even if they were hidden in fog of war. This let the player hit enemies they couldn't see, pulling aggro blindly.
+- **Fix:** Added `if (!visibleTiles.has(tx + ',' + ty)) break;` at main.js:257, before the `getEntityAt()` call. Uses the existing module-level `visibleTiles` Set (line 17), which is recomputed via `FOVSystem.compute()` on every move. Using `break` (not `continue`) because if a tile is outside FOV, all tiles further in that direction are also not visible.
+- **Impact:** Minimal, single-line addition. No new APIs, no cross-module changes.

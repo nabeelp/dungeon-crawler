@@ -254,6 +254,7 @@
           const ty = newY + dy * i;
           if (!Utils.inBounds(tx, ty)) break;
           if (!WALKABLE_TILES.has(tiles[ty][tx])) break;
+          if (!visibleTiles.has(tx + ',' + ty)) break;
           const rangeTarget = GameState.getEntityAt(tx, ty, player.floor);
           if (rangeTarget && rangeTarget.type === 'monster' && rangeTarget.alive) {
             CombatSystem.meleeAttack(player, rangeTarget);
@@ -268,6 +269,8 @@
       const trapDmg = Utils.createRNG(Date.now()).randInt(3, 8);
       player.hp -= trapDmg;
       GameState.addMessage('You triggered a trap! ' + trapDmg + ' damage!', 'combat');
+      Renderer.triggerShake(Math.min(trapDmg / 10, 5));
+      Renderer.spawnDamageNumber(newX, newY, trapDmg, 'player_damage');
     }
 
     // Check for items on ground
@@ -444,6 +447,7 @@
   function handleDeath(player) {
     GameState.setPhase(PHASES.DEAD);
     GameState.addMessage('You have been slain!', 'system');
+    Renderer.triggerShake(8);
 
     const score = HUD.calculateScore(player);
     HUD.saveHighScore({

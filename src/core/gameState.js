@@ -78,7 +78,7 @@
       xpValue:       opts.xpValue ?? 0,
       templateKey:   opts.templateKey || null,
       _buffs:        opts._buffs ? [...opts._buffs] : [],
-      regenCooldown: opts.regenCooldown ?? 0,
+      regenCooldown: opts.regenCooldown ?? ((opts.classKey && Constants.REGEN_COOLDOWN && Constants.REGEN_COOLDOWN[opts.classKey]) || 5),
 
       // Is entity alive?
       alive: true

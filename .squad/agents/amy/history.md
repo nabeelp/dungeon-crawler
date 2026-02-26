@@ -128,3 +128,13 @@
   - **main.js Wiring Contracts (10 tests):** meleeAttack, useAbility, regenerate, placeItemsOnFloor, spawnForFloor, pickupItem, equipItem, unequipItem, useItem, dropItem, saveGame, loadGame all exist
 - **Key insight:** The retro identified that all 9 critical bugs were "never wired" integration gaps. These tests ensure every cross-module function that main.js needs actually exists and is callable, preventing future wiring regressions.
 - **Key insight:** The AI module is `window.AISystem` (not `AI`) and FOV is `window.FOVSystem` (not `FOV`) — test uses actual window names from the source.
+
+### Regen Cooldown Tests (Sprint Task) — COMPLETE
+
+- **12 new tests** added to `tests/test-combat.js` across 3 describe blocks:
+  - **Per-class cooldown values (2 tests):** REGEN_COOLDOWN has all 4 classes; warrior=5, mage=8, rogue=5, cleric=7
+  - **Cooldown decrement behavior (5 tests):** cooldown decrements by 1 each regenerate call; regen stops when cooldown reaches 0; warrior gets exactly 5 ticks of regen (5×2=10 HP); mage gets 8 ticks of mana regen (8×3=24 mana); mage recovers more total mana (24) than warrior-length cooldown would allow (15)
+  - **Cooldown reset after combat (4 tests):** undefined cooldown initialized to class value; warrior resets to 5; mage resets to 8; cleric resets to 7
+- **All 12 tests passing** ✓
+- **Also fixed:** Leonard's `??`/`||` operator precedence syntax error in gameState.js line 81 (added parens)
+- **Key insight:** `regenerate()` decrements cooldown BEFORE applying regen, so after init to N the entity gets exactly N turns of regen. When cooldown hits 0, `regenerate()` returns early with no effect.

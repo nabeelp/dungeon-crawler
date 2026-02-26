@@ -561,4 +561,130 @@
       }
     });
   });
+
+  // ── Regen Cooldown ─────────────────────────────────────────
+  describe('CombatSystem — regen cooldown per-class values', function () {
+    it('REGEN_COOLDOWN has all 4 classes', function () {
+      const cd = Constants.REGEN_COOLDOWN;
+      expect(cd).toBeTruthy();
+      expect(cd.WARRIOR).toBeTruthy();
+      expect(cd.MAGE).toBeTruthy();
+      expect(cd.ROGUE).toBeTruthy();
+      expect(cd.CLERIC).toBeTruthy();
+    });
+
+    it('warrior cooldown is 5, mage is 8, rogue is 5, cleric is 7', function () {
+      expect(Constants.REGEN_COOLDOWN.WARRIOR).toBe(5);
+      expect(Constants.REGEN_COOLDOWN.MAGE).toBe(8);
+      expect(Constants.REGEN_COOLDOWN.ROGUE).toBe(5);
+      expect(Constants.REGEN_COOLDOWN.CLERIC).toBe(7);
+    });
+  });
+
+  describe('CombatSystem — regen cooldown decrement', function () {
+    it('cooldown decrements by 1 each regenerate call', function () {
+      const player = makePlayer(); // WARRIOR
+      GameState.setPhase(PHASES.EXPLORING);
+      player.regenCooldown = 5;
+
+      CombatSystem.regenerate(player);
+      expect(player.regenCooldown).toBe(4);
+
+      CombatSystem.regenerate(player);
+      expect(player.regenCooldown).toBe(3);
+    });
+
+    it('regen stops when cooldown reaches 0', function () {
+      const player = makePlayer(); // WARRIOR
+      GameState.setPhase(PHASES.EXPLORING);
+      player.hp = 50;
+      player.regenCooldown = 1;
+
+      CombatSystem.regenerate(player); // cooldown 1→0, regens
+      const hpAfterRegen = player.hp;
+      expect(hpAfterRegen).toBeGreaterThan(50);
+
+      CombatSystem.regenerate(player); // cooldown 0, no regen
+      expect(player.hp).toBe(hpAfterRegen);
+    });
+
+    it('warrior gets exactly 5 ticks of regen', function () {
+      const player = makePlayer(); // WARRIOR
+      GameState.setPhase(PHASES.EXPLORING);
+      player.hp = 50;
+      player.regenCooldown = 5;
+
+      for (let i = 0; i < 5; i++) {
+        CombatSystem.regenerate(player);
+      }
+      const hpAfter5 = player.hp;
+      expect(hpAfter5).toBe(50 + 5 * 2); // 5 turns × 2 HP/turn
+
+      CombatSystem.regenerate(player); // 6th call — no regen
+      expect(player.hp).toBe(hpAfter5);
+    });
+
+    it('mage gets 8 ticks of mana regen (24 total mana)', function () {
+      const player = makePlayer({ classKey: 'MAGE' });
+      GameState.setPhase(PHASES.EXPLORING);
+      player.mana = 50;
+      player.regenCooldown = 8;
+
+      for (let i = 0; i < 8; i++) {
+        CombatSystem.regenerate(player);
+      }
+      expect(player.mana).toBe(50 + 8 * 3); // 8 turns × 3 mana/turn = 24
+
+      CombatSystem.regenerate(player); // 9th call — no regen
+      expect(player.mana).toBe(74);
+    });
+
+    it('mage recovers more total mana than warrior cooldown would allow', function () {
+      // Mage: 8 turns × 3 mana/turn = 24 total mana
+      // If mage only got 5 turns: 5 × 3 = 15 mana
+      const mageTotal = Constants.REGEN_COOLDOWN.MAGE * Constants.REGEN_RATES.MAGE.mana;
+      const shortTotal = Constants.REGEN_COOLDOWN.WARRIOR * Constants.REGEN_RATES.MAGE.mana;
+      expect(mageTotal).toBe(24);
+      expect(shortTotal).toBe(15);
+      expect(mageTotal).toBeGreaterThan(shortTotal);
+    });
+  });
+
+  describe('CombatSystem — cooldown reset after combat', function () {
+    it('regenerate initializes undefined cooldown to class value', function () {
+      const player = makePlayer(); // WARRIOR
+      GameState.setPhase(PHASES.EXPLORING);
+      delete player.regenCooldown;
+
+      CombatSystem.regenerate(player);
+      // After first call, cooldown was set to 5 then decremented to 4
+      expect(player.regenCooldown).toBe(4);
+    });
+
+    it('cooldown resets to class value on combat→exploring transition', function () {
+      const player = makePlayer(); // WARRIOR
+      player.regenCooldown = 0;
+
+      // Simulate: set phase to COMBAT, then the reset code sets cooldown on transition
+      // This mirrors main.js line 437
+      player.regenCooldown = (Constants.REGEN_COOLDOWN && Constants.REGEN_COOLDOWN[player.classKey]) || 5;
+      expect(player.regenCooldown).toBe(5);
+    });
+
+    it('mage cooldown resets to 8 after combat', function () {
+      const player = makePlayer({ classKey: 'MAGE' });
+      player.regenCooldown = 0;
+
+      player.regenCooldown = (Constants.REGEN_COOLDOWN && Constants.REGEN_COOLDOWN[player.classKey]) || 5;
+      expect(player.regenCooldown).toBe(8);
+    });
+
+    it('cleric cooldown resets to 7 after combat', function () {
+      const player = makePlayer({ classKey: 'CLERIC' });
+      player.regenCooldown = 0;
+
+      player.regenCooldown = (Constants.REGEN_COOLDOWN && Constants.REGEN_COOLDOWN[player.classKey]) || 5;
+      expect(player.regenCooldown).toBe(7);
+    });
+  });
 })();

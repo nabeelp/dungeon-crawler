@@ -105,6 +105,10 @@
       if (effect.type === 'poisoned' && effect.damage && entity.alive) {
         entity.hp -= effect.damage;
         GameState.addMessage(`${entity.name} takes ${effect.damage} poison damage.`, 'combat');
+        if (window.Renderer) {
+          Renderer.spawnDamageNumber(entity.x, entity.y, effect.damage, entity.type === 'player' ? 'player_damage' : 'enemy_damage');
+          if (entity.type === 'player') Renderer.triggerShake(Math.min(effect.damage / 10, 5));
+        }
         if (entity.hp <= 0) {
           entity.hp = 0;
           entity.alive = false;
@@ -117,6 +121,10 @@
       if (effect.type === 'bleed' && effect.damage && entity.alive) {
         entity.hp -= effect.damage;
         GameState.addMessage(`${entity.name} takes ${effect.damage} bleed damage.`, 'combat');
+        if (window.Renderer) {
+          Renderer.spawnDamageNumber(entity.x, entity.y, effect.damage, entity.type === 'player' ? 'player_damage' : 'enemy_damage');
+          if (entity.type === 'player') Renderer.triggerShake(Math.min(effect.damage / 10, 5));
+        }
         if (entity.hp <= 0) {
           entity.hp = 0;
           entity.alive = false;
@@ -221,6 +229,13 @@
     } else {
       GameState.addMessage(`${baseMsg}${hpTag}`, 'combat');
     }
+    // Visual feedback: damage number + screen shake on player hit
+    if (window.Renderer) {
+      const isPlayerHit = defender.type === 'player';
+      const dmgType = isCrit ? 'critical' : (isPlayerHit ? 'player_damage' : 'enemy_damage');
+      Renderer.spawnDamageNumber(defender.x, defender.y, dealt, dmgType);
+      if (isPlayerHit) Renderer.triggerShake(Math.min(dealt / 10, 5));
+    }
     return isCrit;
   }
 
@@ -296,6 +311,8 @@
     let hitCount = 0;
     for (const ent of entities) {
       if (ent.id === attacker.id) continue;
+      // Skip entities on the same side (prevent friendly fire)
+      if ((attacker.type === 'player') === (ent.type === 'player')) continue;
       const dist = Utils.chebyshevDist(targetX, targetY, ent.x, ent.y);
       if (dist <= radius) {
         const rawDmg = Math.floor(calcBaseDamage(attacker, ent) * damageMultiplier);
@@ -303,6 +320,10 @@
         if (dealt > 0) {
           const pct = hpPercent(ent);
           GameState.addMessage(`${ent.name} takes ${dealt} AoE damage [${pct}% HP]`, 'combat');
+          if (window.Renderer) {
+            Renderer.spawnDamageNumber(ent.x, ent.y, dealt, ent.type === 'player' ? 'player_damage' : 'enemy_damage');
+            if (ent.type === 'player') Renderer.triggerShake(Math.min(dealt / 10, 5));
+          }
         }
         if (!ent.alive) {
           onKill(attacker, ent);
@@ -508,6 +529,7 @@
         const amount = Math.min(25, user.maxHp - user.hp);
         user.hp += amount;
         GameState.addMessage(`${user.name} heals for ${amount} HP.`, 'combat');
+        if (window.Renderer && amount > 0) Renderer.spawnDamageNumber(user.x, user.y, amount, 'heal');
         return true;
       }
     },

@@ -355,3 +355,13 @@ Leslie's proposal won: instead of a flat 5-turn cooldown for all classes, each c
 
 ### Pre-existing Issue Noted
 The `regenCooldown` field is initialized to `0` in `createEntity()` (gameState.js:81), which means `regenerate()` skips the `=== undefined` branch and hits `<= 0` returning immediately. This affects new players who haven't exited combat yet. This is a pre-existing issue (Howard's save/load fix set default to 0), not introduced by this change.
+
+## Sprint Fixes (2026-02-27)
+
+### Fix 1: regenCooldown initialized to 0 (CRITICAL)
+- **Problem:** `createEntity()` in gameState.js set `regenCooldown: 0`. Since `regenerate()` checks `if (regenCooldown <= 0) return`, new players got ZERO regen until their first combat ended and reset the cooldown.
+- **Fix:** Changed `gameState.js:81` from `regenCooldown: opts.regenCooldown ?? 0` to `regenCooldown: opts.regenCooldown ?? (opts.classKey && Constants.REGEN_COOLDOWN && Constants.REGEN_COOLDOWN[opts.classKey]) || 5`. Now entities start with their per-class cooldown value (WARRIOR:5, MAGE:8, ROGUE:5, CLERIC:7), falling back to 5 for monsters/unknowns. Save/load still works because `opts.regenCooldown` is preserved via `??`.
+
+### Fix 2: AoE hits friendlies (MAJOR)
+- **Problem:** `aoeAttack()` in combat.js only filtered out `attacker.id`, meaning player fireballs hit allies and boss fireballs hit the boss's own whelps.
+- **Fix:** Added faction check in `aoeAttack()` after the self-skip: `if ((attacker.type === 'player') === (ent.type === 'player')) continue;`. Player AoE now only hits monsters; monster AoE only hits the player. Uses `entity.type` field ('player'|'monster'|'npc') which is already set on all entities via `createEntity()`. No full faction system needed.
