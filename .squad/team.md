@@ -17,6 +17,7 @@
 | Howard | Rendering + Fog of War | `.squad/agents/howard/charter.md` | ✅ Active |
 | Raj | Items + Loot | `.squad/agents/raj/charter.md` | ✅ Active |
 | Amy | Tester | `.squad/agents/amy/charter.md` | ✅ Active |
+| Leslie | Critic | `.squad/agents/leslie/charter.md` | ✅ Active |
 | Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 📋 Silent |
 | Ralph | Work Monitor | — | 🔄 Monitor |
 

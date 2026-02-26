@@ -12,6 +12,7 @@ How to decide who handles what.
 | HTML5 Canvas rendering, tilemap, viewport, fog of war, raycasting | Howard | Canvas drawing, tile rendering, visibility, camera, UI |
 | Items, weapons, armor, potions, scrolls, loot tables, identification | Raj | Item generation, loot drops, unidentified items, inventory |
 | Testing, quality, edge cases, integration verification | Amy | Unit tests, gameplay tests, balance testing, regression |
+| Critical review, design critique, assumption challenging, code review | Leslie | Feature evaluation, architecture critique, balance analysis, edge case identification |
 | Session logging | Scribe | Automatic — never needs routing |
 
 ## Rules
