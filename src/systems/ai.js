@@ -369,7 +369,7 @@
         const dealt = CombatSystem.applyDamage(player, rawDmg);
         CombatSystem.postAttackMsg(entity, player, dealt, `${entity.name} unleashes a devastating attack on ${player.name} for ${dealt} damage!`);
         if (!player.alive) {
-          GameState.addMessage(`${player.name} is slain!`, 'combat');
+          window.CombatSystem && CombatSystem.onKill && CombatSystem.onKill(entity, player);
         }
       } else {
         CombatSystem.aoeAttack(entity, player.x, player.y, 2, 2.5, entity.floor);

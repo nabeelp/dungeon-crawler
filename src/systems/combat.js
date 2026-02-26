@@ -109,7 +109,8 @@
           entity.hp = 0;
           entity.alive = false;
           GameState.addMessage(`${entity.name} dies from poison!`, 'combat');
-          onKill(effect.source || null, entity);
+          const killer = effect.sourceId ? GameState.state.entities.find(e => e.id === effect.sourceId) || null : null;
+          onKill(killer, entity);
         }
       }
       // Bleed tick
@@ -120,7 +121,8 @@
           entity.hp = 0;
           entity.alive = false;
           GameState.addMessage(`${entity.name} bleeds out!`, 'combat');
-          onKill(effect.source || null, entity);
+          const killer = effect.sourceId ? GameState.state.entities.find(e => e.id === effect.sourceId) || null : null;
+          onKill(killer, entity);
         }
       }
       effect.duration--;
@@ -213,7 +215,7 @@
     if (isCrit) {
       GameState.addMessage(`CRITICAL! ${baseMsg}${hpTag}`, 'combat');
       if (defender.alive) {
-        addStatusEffect(defender, 'bleed', { duration: 3, damage: 2, source: attacker });
+        addStatusEffect(defender, 'bleed', { duration: 3, damage: 2, sourceId: attacker.id });
         GameState.addMessage(`${defender.name} is bleeding!`, 'combat');
       }
     } else {
@@ -490,7 +492,7 @@
         if (dist > 1) return fail('Too far for Poison Blade.');
         const rawDmg = calcBaseDamage(user, target);
         const dealt = applyDamage(target, rawDmg);
-        addStatusEffect(target, 'poisoned', { duration: 5, damage: 3, source: user });
+        addStatusEffect(target, 'poisoned', { duration: 5, damage: 3, sourceId: user.id });
         postAttackMsg(user, target, dealt, `${user.name} poisons ${target.name} for ${dealt} damage! Poisoned for 5 turns`);
         if (!target.alive) onKill(user, target);
         return true;

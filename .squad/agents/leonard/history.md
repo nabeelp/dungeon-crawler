@@ -145,3 +145,17 @@
 - **combat.js `meleeAttack()`:** Added ranged attack path before the "too far" fail. Checks `attacker.classKey`, looks up `Constants.CLASSES`, verifies `dist <= range` and LOS. Applies 50% base damage. Calls `onKill` on kill.
 - **main.js `tryMove()`:** After player moves to empty tile, scans movement direction for enemies at range 2–4. If found, calls `CombatSystem.meleeAttack()` which routes to the ranged path.
 - **README.md:** Documented Arcane Bolt as passive under Mage class. Added regen cooldown note under Resource Regeneration.
+
+## Review Fixes (2026-02-27)
+
+### 1. effect.source → effect.sourceId (Serialization Fix)
+- **Problem:** Status effects stored full entity object references in `effect.source`, bloating JSON saves and risking circular references.
+- **combat.js `postAttackMsg()`:** Changed crit bleed from `source: attacker` → `sourceId: attacker.id`.
+- **combat.js `poison_blade`:** Changed from `source: user` → `sourceId: user.id`.
+- **combat.js `tickStatusEffects()`:** DOT kill paths now look up killer via `GameState.state.entities.find(e => e.id === effect.sourceId)` instead of reading `effect.source` directly.
+- **Impact:** Status effects now serialize cleanly — only a numeric ID is stored, not the full entity tree.
+
+### 2. Boss Telegraph Kills Now Call onKill
+- **Problem:** Dragon Lord's telegraphed melee attack (3x damage) used `CombatSystem.applyDamage()` directly, which sets `alive = false` but doesn't call `onKill()`. Kills skipped XP, loot, and death announcements.
+- **ai.js `behaviorBoss`:** Replaced the inline `GameState.addMessage` death message with `window.CombatSystem && CombatSystem.onKill && CombatSystem.onKill(entity, player)`, routing through the canonical kill handler.
+- **Note:** The AoE fire breath path already routed through `CombatSystem.aoeAttack()` which calls `onKill` internally — no change needed there.
