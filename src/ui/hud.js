@@ -373,9 +373,9 @@
     ctx.fillText('── Controls ──', w / 2, ctrlY);
     ctx.fillStyle = '#AAA';
     ctx.font = '12px monospace';
-    ctx.fillText('Move: Arrow Keys / WASD    Abilities: 1-3', w / 2, ctrlY + 20);
-    ctx.fillText('Pick Up: G    Stairs: > <    Inventory: I', w / 2, ctrlY + 36);
-    ctx.fillText('Wait: Space    Help: ?', w / 2, ctrlY + 52);
+    ctx.fillText('Move: Arrows/WASD  Diagonal: Numpad/YUBN', w / 2, ctrlY + 20);
+    ctx.fillText('Abilities: 1-3    Pick Up: G    Stairs: > <', w / 2, ctrlY + 36);
+    ctx.fillText('Inventory: I    Wait: Space    Help: ?', w / 2, ctrlY + 52);
 
     // High scores
     loadHighScores();
@@ -460,10 +460,11 @@
   }
 
   function calculateScore(player) {
-    return (GameState.getCurrentFloor() + 1) * 100
+    const baseScore = (GameState.getCurrentFloor() + 1) * 100
       + player.level * 50
-      + player.xp
-      + GameState.getTurnCounter();
+      + player.xp;
+    const turnPenalty = Math.floor(GameState.getTurnCounter() / 10);
+    return Math.max(0, baseScore - turnPenalty);
   }
 
   // ── Help Screen Overlay ─────────────────────────────────────
@@ -503,7 +504,8 @@
 
     // MOVEMENT & EXPLORATION
     sectionTitle('MOVEMENT & EXPLORATION');
-    helpLine('Arrow Keys or WASD to move');
+    helpLine('Arrow Keys or WASD to move (cardinal)');
+    helpLine('Numpad 7/9/1/3 or Y/U/B/N to move diagonally');
     helpLine('Walk into enemies to attack (melee)');
     helpLine('> or .  to descend stairs (stand on gold > tile)');
     helpLine('< or ,  to ascend stairs (stand on silver < tile)');

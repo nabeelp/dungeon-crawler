@@ -30,7 +30,8 @@ python -m http.server 8000
 
 | Action | Keys |
 |--------|------|
-| **Move** | Arrow Keys or WASD |
+| **Move (cardinal)** | Arrow Keys or WASD |
+| **Move (diagonal)** | Numpad 7/9/1/3 or Y/U/B/N |
 | **Attack** | Walk into enemies (melee auto-attack) |
 | **Descend Stairs** | `>` or `.` (while standing on gold stairs) |
 | **Ascend Stairs** | `<` or `,` (while standing on silver stairs) |
@@ -96,6 +97,7 @@ Turn-based system with action resolution:
 - Pick up weapons, armor, potions, scrolls, rings, and food
 - Items can be **identified** or **unidentified** (use an unidentified item to learn what it is)
 - Equip items to boost stats; unequip to swap gear
+- **Inventory Cap** — Maximum of 20 items per character; drop items to make room
 - **Risk/Reward** — Unidentified items may be beneficial or cursed
 
 ### Fog of War

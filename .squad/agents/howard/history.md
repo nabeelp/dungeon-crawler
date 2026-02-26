@@ -107,3 +107,10 @@
 - **Bug #3 — Self-targeting abilities work without enemies:** `tryAbility()` now checks the ability definition's `type` field from `CombatSystem.ABILITIES` before requiring an enemy target. Abilities with type `'self'`, `'party'`, or `'buff'` fire immediately with the player as both source and target. Heal, War Cry, Evade, Arcane Shield, and Divine Shield all work between fights now.
 - **Dead code cleanup:** Removed the fallback combat path in `tryMove()` (unreachable since CombatSystem always loads) and the orphaned `checkLevelUp()` function in main.js. Removed unused `XP_PER_LEVEL` import.
 - **README updated:** Ability keybind description now clarifies that self-targeting abilities work anywhere, while offensive abilities auto-target nearest visible enemy.
+
+### P0/P1/P2 Fix Sprint (Howard)
+
+- **P1 — Diagonal movement added:** Players now have 8-way movement matching monsters. Numpad 7/8/9/4/6/1/2/3 for full directional control (checked via `e.code` to avoid conflict with ability keys 1-9). Vi-keys Y/U/B/N for diagonal movement. Numpad 5 = wait. All diagonal moves go through the same `tryMove()` path (walkable check, bump-combat, traps, ground items).
+- **P0 — Ability distance function fixed:** `tryAbility()` was using `Utils.manhattanDist` to find nearest enemy while all other systems (AI, combat phase) use `Utils.chebyshevDist`. Changed to `chebyshevDist` so ability targeting is consistent. Manhattan distance was overcounting diagonal distance (e.g. 2 tiles diagonal = manhattan 4 vs chebyshev 2), causing abilities to miss targets that should be in range.
+- **P2 — Score formula fixed:** `calculateScore()` was adding `getTurnCounter()` as a positive term, rewarding slow play. Changed to subtract `Math.floor(turns / 10)` from base score, clamped to minimum 0. Base score remains `floor*100 + level*50 + xp`. Now faster clears score higher.
+- **Documentation updated:** README controls table split into cardinal/diagonal rows. Title screen controls quick-reference updated. In-game help screen (hud.js) updated with diagonal key info.

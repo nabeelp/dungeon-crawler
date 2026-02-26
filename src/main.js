@@ -383,7 +383,7 @@
       let nearest = null;
       let nearestDist = Infinity;
       for (const e of enemies) {
-        const d = Utils.manhattanDist(player.x, player.y, e.x, e.y);
+        const d = Utils.chebyshevDist(player.x, player.y, e.x, e.y);
         if (d < nearestDist) {
           nearestDist = d;
           nearest = e;
@@ -642,7 +642,31 @@
       return;
     }
 
-    // Movement (arrow keys + WASD)
+    // Numpad movement (cardinal + diagonal) — checked first via e.code
+    const numpadMoveMap = {
+      'Numpad8': { dx: 0,  dy: -1 },
+      'Numpad2': { dx: 0,  dy:  1 },
+      'Numpad4': { dx: -1, dy:  0 },
+      'Numpad6': { dx: 1,  dy:  0 },
+      'Numpad7': { dx: -1, dy: -1 },
+      'Numpad9': { dx: 1,  dy: -1 },
+      'Numpad1': { dx: -1, dy:  1 },
+      'Numpad3': { dx: 1,  dy:  1 }
+    };
+
+    if (numpadMoveMap[e.code]) {
+      e.preventDefault();
+      processPlayerAction({ type: 'move', ...numpadMoveMap[e.code] });
+      return;
+    }
+
+    // Numpad 5 = wait
+    if (e.code === 'Numpad5') {
+      processPlayerAction({ type: 'wait' });
+      return;
+    }
+
+    // Movement (arrow keys + WASD + vi-keys for diagonal)
     const moveMap = {
       'ArrowUp':    { dx: 0, dy: -1 },
       'ArrowDown':  { dx: 0, dy:  1 },
@@ -651,7 +675,11 @@
       'w':          { dx: 0, dy: -1 },
       's':          { dx: 0, dy:  1 },
       'a':          { dx: -1, dy: 0 },
-      'd':          { dx: 1,  dy: 0 }
+      'd':          { dx: 1,  dy: 0 },
+      'y':          { dx: -1, dy: -1 },
+      'u':          { dx: 1,  dy: -1 },
+      'b':          { dx: -1, dy:  1 },
+      'n':          { dx: 1,  dy:  1 }
     };
 
     if (moveMap[key]) {
