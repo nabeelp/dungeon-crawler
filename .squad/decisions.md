@@ -459,3 +459,120 @@ Added three visual juice systems to renderer.js with game loop integration in ma
 - **Leonard (Combat/AI):** Can call `Renderer.triggerShake()` and `Renderer.spawnDamageNumber()` after combat resolution to add visual feedback. Guard with `window.Renderer && Renderer.triggerShake`.
 - **Main.js game loop:** Now checks `Renderer.hasActiveAnimations()` each frame. When animations are active, rendering is continuous. When idle, returns to dirty-flag mode (zero CPU).
 - **No new dependencies.** All effects are self-contained in renderer.js.
+
+---
+
+## 12. Leslie's Full Game Critique — Critical Bugs Found
+
+**Author:** Leslie (Critic)  
+**Date:** 2026-02-26  
+**Status:** Complete  
+**Type:** Code Audit / Bug Report  
+
+Comprehensive review of all 14 source files identified 6 critical bugs, 7 serious design issues, and 3 minor issues. Priority fix list provided.
+
+### 🔴 CRITICAL — Must Fix Before Release
+
+1. **Double XP / Double Level-Up on Monster Kill** (main.js:190-195, combat.js:289-296)  
+   - Both locations award XP and call checkLevelUp on same kill
+   - Players get double XP; stat gains are inconsistent (different formulas)
+   - **Fix:** Remove XP award and checkLevelUp from main.js (let combat.js handle it)
+
+2. **Save/Load Loses Critical Entity & Item State**  
+   - JSON round-trip drops: statusEffects, tags, xpValue, templateKey, _buffs, _enraged, _telegraphing, _summonedPhase2/3, item._defKey
+   - Module-level state (_idMap, _reverseIdMap, _identifiedKeys in items.js) never saved/restored
+   - **Impact:** Monsters give 0 XP, Cleric Smite broken, boss phases broken, item identification reset, potion names random
+   - **Fix:** Implement selective serialization for these fields; save/restore ItemSystem state
+
+3. **ItemSystem.init() Never Called** (Decision #4)  
+   - Identification maps (_idMap, _reverseIdMap) stay empty
+   - All generated potions/scrolls have undefined appearance names
+   - **Fix:** Call `ItemSystem.init(rng)` in main.js startNewGame()
+
+4. **ItemSystem.dropLoot() Never Called** (Decision #7)  
+   - Combat.js onKill() only awards XP, never calls dropLoot
+   - Monsters never drop loot; entire loot system is dead code
+   - **Fix:** Call `ItemSystem.dropLoot(victim, victim.floor)` in combat.js onKill()
+
+5. **ItemSystem.tickBuffs() Never Called** (Decision #4)  
+   - Buff/debuff effects never expire
+   - Single Strength Potion grants permanent +5 attack
+   - **Fix:** Call `ItemSystem.tickBuffs(entity)` once per turn for all entities
+
+6. **createItem() Strips Custom Properties** (gameState.js:86-105)  
+   - createItem doesn't preserve _defKey (potions/scrolls) or special (Flamebrand's fire_dot)
+   - **Fix:** Modify createItem to preserve custom properties via spread or explicit fields
+
+### 🟡 SERIOUS — Significantly Hurts Experience
+
+1. **Math.random() Breaks Determinism** (combat.js:137, ai.js:154/171/233/245/306/375, items.js:199/213-214)  
+   - Game claims seeded determinism but combat/AI use Math.random()
+   - **Fix:** Replace all Math.random() with seeded RNG (use rng instance from appropriate scope)
+
+2. **Helmet/Boots/Amulet Extremely Rare** (items.js TYPE_WEIGHTS)  
+   - Only appear via 30% bonus roll; expected ~0.1 helmets per floor
+   - **Fix:** Add helmets, boots, amulets to TYPE_WEIGHTS with reasonable probabilities (5-15% each)
+
+3. **Combat Phase Threshold Too Tight** (main.js:360-379)  
+   - COMBAT phase only set when visible enemy within Chebyshev distance ≤ 2
+   - Ranged enemies attack from 6+ tiles without COMBAT indicator
+   - **Fix:** Increase threshold to 6-8 tiles for ranged attackers
+
+4. **Self-Targeting Abilities Blocked** (main.js:330-358)  
+   - Heal, War Cry, Evade, Arcane Shield, Divine Shield can't be used when no enemies visible
+   - Can't heal when safe
+   - **Fix:** Allow self-targeting abilities without requiring target in range
+
+5. **Fireball AoE Hits Friendlies** (combat.js aoeAttack:259-279)  
+   - Hits all entities except attacker
+   - Will damage player's NPC allies and boss's own minions
+   - **Fix:** Filter aoeAttack to skip allies (need allegiance flag or faction system)
+
+6. **No Inventory Cap** (entity.inventory.length unbounded)  
+   - Players can hoard every item across all 10 floors
+   - UI becomes unusable with 50+ items; no strategic decisions
+   - **Fix:** Implement max_inventory (e.g., 20-30 slots)
+
+7. **Scroll of Teleport Can Land Unsafely** (items.js:210-216)  
+   - Picks random room and position without verifying walkable or unoccupied
+   - Player could teleport onto wall or monster
+   - **Fix:** Validate tile is walkable and unoccupied before accepting teleport
+
+### 🟢 MINOR — Annoying But Livable
+
+1. **Doors Block FOV But Are Walkable** (constants.js OPAQUE_TILES)  
+   - No open/close mechanic; doors just block sight permanently
+   - Walking through doesn't change appearance
+   - **Status:** Confusing but functional; low priority
+
+2. **Score Formula Rewards Slow Play** (hud.js:462-467)  
+   - Turn counter is positive term in score calculation
+   - Incentivizes waiting instead of efficient play
+   - **Fix:** Remove turn count or invert (penalize high turn counts)
+
+3. **No Diagonal Movement Keys** (main.js movement)  
+   - Only 4-directional (arrows/WASD)
+   - Despite 8-directional combat and AI pathfinding
+   - **Fix:** Add numpad or vi-keys (hjkl) for 8-directional movement
+
+### What Works Well
+
+- **BSP dungeon generation:** Clean, deterministic, good layouts — don't touch
+- **FOV shadowcasting:** Correct, performant octant-based algorithm
+- **A* pathfinding:** Well-implemented, 8-directional, respects collisions
+- **Module architecture:** Simple IIFE pattern, robust load-order guards
+- **Render-on-demand:** Proper dirty-flag pattern for turn-based games
+- **Status effect system:** Well-structured stacking/replacement/expiry
+- **Equipment stat mods:** Symmetric equip/unequip, clean application
+
+### Priority Fix Order
+
+1. Double XP/level-up (easy, critical)
+2. ItemSystem.init(), dropLoot(), tickBuffs() wiring (easy, critical)
+3. createItem custom property preservation (easy-medium, critical)
+4. Save/load state persistence (medium, critical)
+5. Helmet/boots/amulet TYPE_WEIGHTS (easy, serious)
+6. Self-targeting ability access (easy, serious)
+7. Math.random() → seeded RNG (medium, serious)
+8. Combat phase threshold expansion (easy, serious)
+9. Remaining issues (low priority, polish)

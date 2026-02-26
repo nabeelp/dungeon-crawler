@@ -63,3 +63,18 @@
 - **45+ new tests:** Combat abilities, item system, loot generation, equipment stats, save/load validation
 - **All passing:** Coverage includes edge cases, state transitions, RNG determinism, multi-floor scaling
 - **Test files:** test-combat.js, test-items.js, test-save.js in tests/ directory
+
+## Leslie's Game Audit (2026-02-26)
+
+### Critical Issues Identified in Dungeon/Core
+1. **Save/Load Loses Entity State** — JSON round-trip drops statusEffects, tags, xpValue, _buffs, _enraged, _telegraphing, _summonedPhase fields; also loses module-level ItemSystem state (_idMap, _reverseIdMap, _identifiedKeys)
+   - **Impact:** Monsters give 0 XP, boss AI phases broken, item identification system reset, potions/scrolls unidentified after load
+   - **Fix:** Extend save schema to include custom entity/item fields and ItemSystem state
+
+### Serious Issues Found in XP System
+- **Monster Spawning Silent Failures** — spawnForFloor() uses randInt(room.x+1, room.x+1) on tiny rooms (w=3), combined with collision overlap check, may produce fewer monsters than intended on deep floors
+
+### Integration Notes for Sheldon
+- Priority: (1) Implement save/load state persistence for entity custom fields (statusEffects, tags, xpValue, _buffs, _enraged, _telegraphing, _summonedPhase), (2) Save/restore ItemSystem identification state, (3) Verify monster spawn failures don't occur with current room sizing
+- Blocking: Multiple systems (Leonard, Raj, Howard) depend on proper save/load
+- Architecture: Consider revisiting entity schema to include all persistent fields; may require gameState.js createEntity() or save() function enhancement

@@ -77,5 +77,22 @@
 - **Combat tests:** 15+ tests covering all 12 abilities, status effect application/ticking, damage variance, boss behavior
 - **Item tests:** 15+ tests for equipment stat application/removal, loot generation, drop chance and rates, identification system, inventory management
 - **Save/load tests:** 15+ tests for full game state serialization, equipment persistence, inventory integrity, entity state preservation, permadeath behavior
-- **All passing:** 45+ new tests with edge case coverage (empty inventories, no drops, invalid equipment, state transitions, RNG determinism, multi-floor scaling)
 - **Files:** test-combat.js, test-items.js, test-save.js in tests/ directory; tests/index.html updated
+
+## Leslie's Game Audit (2026-02-26)
+
+### Critical Issues Found in ItemSystem
+1. **ItemSystem.init() Never Called** — Identification maps (_idMap, _reverseIdMap) stay empty; all generated potions/scrolls have undefined appearance names
+2. **ItemSystem.dropLoot() Never Called** — Combat system missing call in onKill(); monsters never drop loot; entire loot system is dead code
+3. **ItemSystem.tickBuffs() Never Called** — Buff/debuff effects never expire; single Strength Potion grants permanent +5 attack
+4. **createItem() Strips Custom Properties** — Custom fields like _defKey (potions/scrolls) and special (Flamebrand's fire_dot) lost during creation
+5. **Save/Load Loses Item State** — item._defKey, _identifiedKeys module state never persisted; item identification system reset on load
+
+### Serious Issues Found
+- **Helmet/Boots/Amulet Extremely Rare** — Only appear via 30% bonus roll in generateLoot(); expect ~0.1 per floor
+- **Scroll of Teleport Unsafe** — items.js:210-216 doesn't verify target tile is walkable or unoccupied; can land on walls/monsters
+
+### Integration Notes for Raj
+- Priority: (1) Ensure createItem preserves _defKey and custom properties, (2) Save/restore _identifiedKeys and potion/scroll identification state in save/load, (3) Implement ItemSystem state serialization
+- Blocking: Leonard needs ItemSystem.dropLoot() wired; tickBuffs() called per turn; init() called on new game
+- Next: Add helmets/boots/amulets to TYPE_WEIGHTS; validate Scroll of Teleport destination

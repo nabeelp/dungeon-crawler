@@ -84,3 +84,22 @@
 - **Help screen updated** in `hud.js` with new REGENERATION section showing per-class rates
 - **README updated** with Resource Regeneration section in Game Systems
 - **Tests updated** in `test-combat.js`: old flat regen test replaced with 4 new tests covering class-based regen, max cap, and combat phase skip
+
+## Leslie's Game Audit (2026-02-26)
+
+### Critical Issues Found in Combat System
+1. **Double XP / Level-Up on Kill** — main.js:190-195 AND combat.js:289-296 both trigger on same kill; inconsistent stat gains
+2. **ItemSystem.dropLoot() Never Called** — combat.js onKill() missing loot drop call; monsters never drop loot
+3. **ItemSystem.tickBuffs() Never Called** — buffs/debuffs permanent; single Strength Potion grants infinite +5 attack
+4. **Save/Load Loses Entity State** — statusEffects, tags, xpValue, _buffs, _enraged, _telegraphing, _summonedPhase fields lost on load; monsters give 0 XP, boss phases broken, Cleric Smite broken
+
+### Serious Issues Found
+- **Math.random() in combat (line 137)** breaks determinism — should use seeded RNG
+- **Math.random() in AI** (lines 154/171/233/245/306/375) breaks determinism
+- **Combat Phase Threshold Too Tight** — set to Chebyshev distance ≤ 2, but ranged enemies attack from 6+ tiles without COMBAT indicator appearing
+- **Self-Targeting Abilities Blocked** — can't use Heal/War Cry/Evade/Divine Shield when no enemies visible; can't heal when safe
+- **Fireball AoE Hits Friendlies** — combat.js aoeAttack hits all entities except attacker; will damage player's NPC allies and boss's own minions
+
+### Integration Notes for Leonard
+- Priority: (1) Fix double XP/level-up by removing award from main.js, (2) Wire ItemSystem.dropLoot() in onKill(), (3) Add ItemSystem.tickBuffs() call per turn, (4) Save/restore buff state
+- Next: Replace Math.random() with seeded RNG where possible; expand combat phase threshold; add allegiance filtering for AoE

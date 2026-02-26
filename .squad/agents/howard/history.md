@@ -66,3 +66,22 @@
 ### Amy Integration Points
 - **Test coverage:** 45+ new tests validate combat balance, item system, equipment stat application, loot drops, save/load
 - **All passing:** Tests include edge cases (empty inventory, no drops, invalid equipment), state transitions, RNG determinism, multi-floor scaling
+
+## Leslie's Game Audit (2026-02-26)
+
+### Critical Issues Found in Game Loop / Main
+1. **Double XP / Level-Up on Kill** — main.js:190-195 AND combat.js:289-296 both award XP/call checkLevelUp; remove from main.js
+2. **ItemSystem.init() Never Called** — Not called in startNewGame(); identification broken on all potions/scrolls
+3. **ItemSystem.dropLoot() Never Called** — Combat's onKill() missing dropLoot call; no monsters drop loot
+4. **ItemSystem.tickBuffs() Never Called** — Not called per turn; all buffs/debuffs permanent
+5. **Save/Load Loses Critical Game State** — statusEffects, tags, xpValue, _buffs, _enraged, _telegraphing, _summonedPhase fields lost; monsters give 0 XP, boss phases broken, item identification reset
+
+### Serious Issues Found
+- **Combat Phase Threshold Too Tight** — Set to Chebyshev distance ≤ 2; ranged enemies at 6+ tiles attack without COMBAT indicator
+- **Self-Targeting Abilities Blocked** — Can't use Heal/War Cry/Evade/Divine Shield when no enemies visible; can't heal when safe
+- **No Inventory Cap** — Unbounded inventory UI breaks with 50+ items; no strategic weight decisions
+- **Score Formula Rewards Slow Play** — Turn count is positive term; should penalize high turn counts
+
+### Integration Notes for Howard
+- Priority: (1) Wire ItemSystem.init() on new game, (2) Add ItemSystem.tickBuffs() call per turn, (3) Implement save/load state persistence for buffs/enraged/telegraphing/summons, (4) Fix double XP removal from main.js
+- Next: Expand combat phase threshold; implement inventory cap; fix score formula
