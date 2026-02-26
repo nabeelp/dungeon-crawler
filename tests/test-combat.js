@@ -461,6 +461,83 @@
     });
   });
 
+  // ── Regression: Player Status Effect Ticking ─────────────
+  describe('CombatSystem — player status effect ticking (regression)', function () {
+    it('poison ticks on player — HP decreases', function () {
+      const player = makePlayer({ hp: 100, maxHp: 100 });
+      CombatSystem.addStatusEffect(player, 'poisoned', { duration: 3, damage: 5 });
+      const hpBefore = player.hp;
+      CombatSystem.tickStatusEffects(player);
+      expect(player.hp).toBe(hpBefore - 5);
+    });
+
+    it('War Cry (+7 attack) expires after 3 ticks — bonus removed', function () {
+      const player = makePlayer();
+      const baseAtk = player.attack;
+      CombatSystem.useAbility('war_cry', player, null);
+      expect(player.attack).toBe(baseAtk + 7);
+      expect(CombatSystem.hasStatus(player, 'buffed')).toBe(true);
+
+      CombatSystem.tickStatusEffects(player); // tick 1: duration 3→2
+      CombatSystem.tickStatusEffects(player); // tick 2: duration 2→1
+      CombatSystem.tickStatusEffects(player); // tick 3: duration 1→0, expires
+
+      expect(player.attack).toBe(baseAtk);
+      expect(CombatSystem.hasStatus(player, 'buffed')).toBe(false);
+    });
+
+    it('bleed ticks on player — damage dealt', function () {
+      const player = makePlayer({ hp: 100, maxHp: 100 });
+      CombatSystem.addStatusEffect(player, 'bleed', { duration: 3, damage: 4 });
+      CombatSystem.tickStatusEffects(player);
+      expect(player.hp).toBe(96);
+    });
+
+    it('stun status exists with duration and is detectable', function () {
+      const player = makePlayer();
+      CombatSystem.addStatusEffect(player, 'stunned', { duration: 2 });
+      expect(CombatSystem.hasStatus(player, 'stunned')).toBe(true);
+      const stun = CombatSystem.getStatus(player, 'stunned');
+      expect(stun).toBeTruthy();
+      expect(stun.duration).toBe(2);
+    });
+
+    it('onKill awards XP when called after DOT kill', function () {
+      const player = makePlayer();
+      player.xp = 0;
+      const monster = makeMonster({ hp: 3, maxHp: 50 });
+      monster.xpValue = 30;
+      CombatSystem.addStatusEffect(monster, 'poisoned', { duration: 5, damage: 10 });
+      CombatSystem.tickStatusEffects(monster);
+      expect(monster.alive).toBe(false);
+      // onKill should award XP for DOT deaths
+      CombatSystem.onKill(player, monster);
+      expect(player.xp).toBe(30);
+    });
+  });
+
+  // ── Regression: Self-Targeting Abilities ──────────────────
+  describe('CombatSystem — self-targeting abilities (regression)', function () {
+    it('Heal succeeds with null target (no enemies nearby)', function () {
+      const player = makePlayer({ classKey: 'CLERIC' });
+      player.hp = 50;
+      const hpBefore = player.hp;
+      const result = CombatSystem.useAbility('heal', player, null);
+      expect(result).toBe(true);
+      expect(player.hp).toBeGreaterThan(hpBefore);
+    });
+
+    it('self-targeting abilities are typed as self', function () {
+      const selfAbilities = ['heal', 'war_cry', 'evade', 'arcane_shield'];
+      for (var i = 0; i < selfAbilities.length; i++) {
+        var key = selfAbilities[i];
+        var info = CombatSystem.getAbilityInfo(key);
+        expect(info).toBeTruthy();
+        expect(info.type).toBe('self');
+      }
+    });
+  });
+
   // ── Bug Fix: Loot Drop on Kill ────────────────────────────
   describe('CombatSystem — loot drop on kill (bug fix)', function () {
     it('killing a boss monster places loot at its position', function () {

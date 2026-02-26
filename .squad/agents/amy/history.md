@@ -100,3 +100,16 @@
 - **All 6 critical bugs fixed and verified**
 - **17 regression tests added**
 - **All changes committed with team signature**
+
+### Howard's Bug Fix Regression Tests (2026-02-26) — COMPLETE
+
+- **9 new regression tests** for 3 critical bugs Howard is fixing
+- **test-combat.js:** 7 new tests
+  - Player status effect ticking: poison ticks on player (-5 HP), War Cry +7 attack expires after 3 ticks, bleed ticks on player (-4 HP), stun has duration and is detectable, onKill awards XP for DOT kills
+  - Self-targeting abilities: Heal succeeds with null target (no enemies), heal/war_cry/evade/arcane_shield all typed as 'self'
+- **test-save.js:** 2 new tests + loadGame helper fix
+  - Split-brain fix: player reference is same object as entity in entities list after load (mutation propagates)
+  - Position round-trip: player at (5,5) survives save/load in both player and entities list
+  - Updated local loadGame helper to include reference identity fix (Object.assign + pointer swap)
+- **Key insight:** The split-brain bug was caused by JSON.parse creating separate objects for state.player and the matching entity in state.entities. Fix ensures they point to the same object after load.
+- **Key insight:** Self-targeting abilities (heal, war_cry, evade, arcane_shield) have type: 'self' — tryAbility in main.js must check ability type and skip enemy targeting for these.

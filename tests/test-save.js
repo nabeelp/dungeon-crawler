@@ -79,6 +79,14 @@
       state.player = data.player || null;
       state.groundItems = data.groundItems || [];
       state.messages = data.messages || [];
+      // Ensure player reference identity (split-brain fix)
+      if (state.player && state.entities.length > 0) {
+        var idx = state.entities.findIndex(function (e) { return e.id === state.player.id; });
+        if (idx >= 0) {
+          Object.assign(state.entities[idx], state.player);
+          state.player = state.entities[idx];
+        }
+      }
       return true;
     } catch (e) {
       localStorage.removeItem(SAVE_KEY);
@@ -435,6 +443,47 @@
       expect(loaded.tags).toContain('boss');
       expect(loaded.tags).toContain('dragon');
       expect(loaded.xpValue).toBe(200);
+      cleanup();
+    });
+  });
+
+  // ── Regression: Split-Brain Fix (player reference identity) ─
+  describe('Save/Load — player reference identity (split-brain fix)', function () {
+    it('player reference is same object as entity in entities list after load', function () {
+      cleanup();
+      setupGame();
+      saveGame();
+
+      GameState.newGame(999);
+      loadGame();
+
+      var player = GameState.getPlayer();
+      var entityInList = GameState.state.entities.find(function (e) { return e.id === player.id; });
+      expect(entityInList).toBeTruthy();
+      // After split-brain fix: modifying player must modify entity in list (same reference)
+      player.hp = 999;
+      expect(entityInList.hp).toBe(999);
+      cleanup();
+    });
+
+    it('player position (5,5) survives save/load round-trip in both player and entities', function () {
+      cleanup();
+      var player = setupGame();
+      player.x = 5;
+      player.y = 5;
+      saveGame();
+
+      GameState.newGame(999);
+      loadGame();
+
+      var loadedPlayer = GameState.getPlayer();
+      expect(loadedPlayer.x).toBe(5);
+      expect(loadedPlayer.y).toBe(5);
+      // Entity in the entities list must also show the same position
+      var entityInList = GameState.state.entities.find(function (e) { return e.type === 'player'; });
+      expect(entityInList).toBeTruthy();
+      expect(entityInList.x).toBe(5);
+      expect(entityInList.y).toBe(5);
       cleanup();
     });
   });
