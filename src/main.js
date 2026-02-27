@@ -278,10 +278,15 @@
     // Check for trap
     if (tileType === TILES.TRAP) {
       const trapDmg = Utils.createRNG(GameState.state.seed + GameState.getTurnCounter()).randInt(3, 8);
-      player.hp -= trapDmg;
-      GameState.addMessage('You triggered a trap! ' + trapDmg + ' damage!', 'combat');
-      Renderer.triggerShake(Math.min(trapDmg / 10, 5));
-      Renderer.spawnDamageNumber(newX, newY, trapDmg, 'player_damage');
+      const dealt = CombatSystem.applyDamage(player, trapDmg);
+      GameState.addMessage('You triggered a trap! ' + dealt + ' damage!', 'combat');
+      Renderer.triggerShake(Math.min(dealt / 10, 5));
+      Renderer.spawnDamageNumber(newX, newY, dealt, 'player_damage');
+      if (player.hp <= 0) {
+        player.alive = false;
+        handleDeath(player);
+        return false;
+      }
     }
 
     // Check for items on ground

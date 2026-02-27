@@ -136,3 +136,13 @@ Added `window.CombatSystem && CombatSystem.onKill && CombatSystem.onKill(entity,
 
 ### Audit
 Full grep of items.js confirmed this was the **only** site where `alive = false` is set. No other scroll effects, potion effects, or damage-dealing items directly kill entities — `_aoeFireball()` was the sole offender.
+
+## Sprint Fixes — Unequip Cap + Deterministic Loot RNG (2026-02-26)
+
+### Fix 1: Unequip bypasses inventory cap
+**Problem:** `unequipItem()` at line 632 did `entity.inventory.push(item)` without checking `MAX_INVENTORY_SIZE`. A player at 20 items could unequip to exceed the cap.
+**Fix:** Added inventory length check before pushing. If at cap, the item is dropped to the ground via `GameState.addGroundItem()` (matching `dropItem()` pattern — sets item.x/y/floor from entity, then calls addGroundItem). Player sees a warning message. Otherwise, normal push to inventory.
+
+### Fix 2: dropLoot uses non-deterministic RNG
+**Problem:** `dropLoot()` at line 722 used `Utils.createRNG(Date.now() + monster.id)`, breaking the seeded-RNG contract — loot drops were not reproducible.
+**Fix:** Replaced with `Utils.createRNG(GameState.state.seed + GameState.getTurnCounter() * 31 + (monster.id || 0))`. This matches the deterministic RNG pattern used elsewhere in main.js (e.g., trap damage, monster spawning).

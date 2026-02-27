@@ -69,6 +69,10 @@
 | ItemSystem | placeItemsOnFloor() | GameState | addGroundItem(item) | Loot gen | Place items on ground | ✅ Wired | Line 501 |
 | ItemSystem | useItem() | ItemSystem | identifyItem(item) | Consume | Identify potion/scroll on use | ✅ Wired | Line 664 |
 | HUD | render() | ItemSystem | getDisplayName(item) | UI render | Get display name for unidentified items | ✅ Wired | Lines 251-252 (in inventory display) |
+| main.js | spawnWanderingMonster() | MonsterFactory | getTemplatesForFloor(floor) | Wandering spawn | Get monster templates for current floor | ✅ Wired | Line 358 |
+| main.js | spawnWanderingMonster() | MonsterFactory | createMonster(key, floor, x, y) | Wandering spawn | Create wandering monster entity | ✅ Wired | Line 363 |
+| main.js | startNewGame() | CombatSystem | init(rng) | Game init | Initialize combat RNG for determinism | ✅ Wired | Line 115 |
+| main.js | startNewGame() | AISystem | init(rng) | Game init | Initialize AI RNG for determinism | ✅ Wired | Line 117 |
 | MonsterFactory | spawnForFloor() | GameState | createEntity(opts) | Spawn | Create monster entity | ✅ Wired | Line 128 |
 | MonsterFactory | spawnForFloor() | GameState | addEntity(monster) | Spawn | Add monster to state | ✅ Wired | Lines 172, 197 |
 

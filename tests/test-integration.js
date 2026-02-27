@@ -195,4 +195,87 @@
     });
   });
 
+  // ── Score Formula ───────────────────────────────────────────
+
+  describe('Integration — Score Formula', function () {
+    it('score increases with floor reached', function () {
+      GameState.newGame(42);
+      const player = GameState.createEntity({
+        name: 'Hero', type: 'player', classKey: 'WARRIOR',
+        x: 5, y: 5, floor: 0
+      });
+      GameState.addEntity(player);
+      GameState.setPlayer(player);
+      player.level = 1; player.xp = 0;
+
+      GameState.setCurrentFloor(0);
+      const scoreFloor1 = HUD.calculateScore(player);
+
+      GameState.setCurrentFloor(4);
+      const scoreFloor5 = HUD.calculateScore(player);
+
+      expect(scoreFloor5).toBeGreaterThan(scoreFloor1);
+    });
+
+    it('score increases with XP', function () {
+      GameState.newGame(42);
+      const player = GameState.createEntity({
+        name: 'Hero', type: 'player', classKey: 'WARRIOR',
+        x: 5, y: 5, floor: 0
+      });
+      GameState.addEntity(player);
+      GameState.setPlayer(player);
+      player.level = 1;
+      GameState.setCurrentFloor(0);
+
+      player.xp = 0;
+      const scoreLowXp = HUD.calculateScore(player);
+
+      player.xp = 500;
+      const scoreHighXp = HUD.calculateScore(player);
+
+      expect(scoreHighXp).toBeGreaterThan(scoreLowXp);
+    });
+
+    it('turn penalty only applies above threshold (floor * 100)', function () {
+      GameState.newGame(42);
+      const player = GameState.createEntity({
+        name: 'Hero', type: 'player', classKey: 'WARRIOR',
+        x: 5, y: 5, floor: 0
+      });
+      GameState.addEntity(player);
+      GameState.setPlayer(player);
+      player.level = 1; player.xp = 0;
+      GameState.setCurrentFloor(0); // floor+1 = 1, threshold = 100
+
+      // Advance turns to exactly threshold — no penalty
+      for (let i = 0; i < 100; i++) GameState.advanceTurn();
+      const scoreAtThreshold = HUD.calculateScore(player);
+
+      // Advance 50 more turns — penalty should apply
+      for (let i = 0; i < 50; i++) GameState.advanceTurn();
+      const scoreOver = HUD.calculateScore(player);
+
+      expect(scoreOver).toBeLessThan(scoreAtThreshold);
+    });
+
+    it('victory doubling works (2× score for beating the game)', function () {
+      GameState.newGame(42);
+      const player = GameState.createEntity({
+        name: 'Hero', type: 'player', classKey: 'WARRIOR',
+        x: 5, y: 5, floor: 0
+      });
+      GameState.addEntity(player);
+      GameState.setPlayer(player);
+      player.level = 5; player.xp = 200;
+      GameState.setCurrentFloor(9);
+
+      const baseScore = HUD.calculateScore(player);
+      const victoryScore = HUD.calculateScore(player) * 2;
+
+      expect(victoryScore).toBe(baseScore * 2);
+      expect(victoryScore).toBeGreaterThan(0);
+    });
+  });
+
 })();

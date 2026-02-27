@@ -79,6 +79,9 @@
       templateKey:   opts.templateKey || null,
       _buffs:        opts._buffs ? [...opts._buffs] : [],
       regenCooldown: opts.regenCooldown ?? ((opts.classKey && Constants.REGEN_COOLDOWN && Constants.REGEN_COOLDOWN[opts.classKey]) || 5),
+      floorTurns:    opts.floorTurns ?? 0,
+      stealthed:     opts.stealthed || false,
+      hasSeenPlayer: opts.hasSeenPlayer || false,
 
       // Is entity alive?
       alive: true

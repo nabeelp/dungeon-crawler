@@ -138,3 +138,30 @@
 - **All 12 tests passing** ✓
 - **Also fixed:** Leonard's `??`/`||` operator precedence syntax error in gameState.js line 81 (added parens)
 - **Key insight:** `regenerate()` decrements cooldown BEFORE applying regen, so after init to N the entity gets exactly N turns of regen. When cooldown hits 0, `regenerate()` returns early with no effect.
+
+### Design Review — Test Coverage Audit (2026-02-26) — COMPLETE
+
+- **Reviewed:** All 7 test files (~200+ tests), all recent feature code
+- **Coverage gaps identified:** 5 features with zero test coverage (backstab stealth multiplier, wandering monsters, trap RNG, score formula, AoE faction filter)
+- **Bugs found:** 1 (trap damage bypasses applyDamage — no floor at 0, no death check)
+- **Key insight:** All untested features live in main.js (integration layer) or hud.js (UI), which are harder to unit test due to closure scoping. Extracting pure logic functions and exposing them on window would make them testable.
+
+### Missing Feature Tests Sprint (2026-02-26) — COMPLETE
+
+- **11 new tests** added across 2 files covering 3 previously untested features:
+- **test-combat.js — Backstab Stealth Multiplier (4 tests):**
+  - Backstab deals 3× when `user.stealthed = true` (statistical comparison over 30 samples)
+  - Backstab deals 1.5× when `user.stealthed = false` and target has seen player (compared to 1× melee)
+  - Stealth is cleared after backstab attack (`player.stealthed` → false)
+  - Taking damage clears stealth via `applyDamage`
+- **test-combat.js — AoE Faction Filter (3 tests):**
+  - Player AoE skips entities with `type: 'player'` (friendly fire prevention)
+  - Monster AoE skips entities with `type: 'monster'` (no monster-on-monster splash)
+  - Player AoE does hit entities with `type: 'monster'` (confirms enemy targeting works)
+- **test-integration.js — Score Formula (4 tests):**
+  - Score increases with floor reached (`setCurrentFloor(0)` vs `setCurrentFloor(4)`)
+  - Score increases with XP (`xp=0` vs `xp=500`)
+  - Turn penalty only applies above threshold (`floor * 100` turns); score drops after exceeding
+  - Victory doubling works (`calculateScore(player) * 2` matches the main.js victory path)
+- **Key patterns:** Backstab tests use statistical sampling (30 iterations) to handle RNG variance; AoE tests verify the `(attacker.type === 'player') === (ent.type === 'player')` faction filter; score tests use `GameState.setCurrentFloor` and `GameState.advanceTurn` to control state.
+- **Both files pass Node.js syntax check** ✓

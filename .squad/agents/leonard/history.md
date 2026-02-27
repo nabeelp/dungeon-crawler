@@ -385,3 +385,17 @@ The `regenCooldown` field is initialized to `0` in `createEntity()` (gameState.j
 - **main.js — `changeFloor()`:** Resets `player.floorTurns = 0` on floor transition.
 - **main.js — `startNewGame()`:** Initializes `player.floorTurns = 0`.
 - **Save/load:** `floorTurns` is on the player entity, which is already fully serialized. No save/load changes needed.
+
+## Sprint Fixes (2026-07-15)
+
+### Fix 1: Scroll of Fireball hits the player (CRITICAL)
+- **Problem:** `_aoeFireball()` in items.js iterated ALL entities with no faction filter and did raw `e.hp -= dmg`, bypassing `applyDamage()` (shields, evade, etc. all ignored). Using a fireball scroll was suicide.
+- **Fix:** Replaced the entire manual damage loop in `_aoeFireball()` with a single call to `CombatSystem.aoeAttack(entity, entity.x, entity.y, 3, 2, entity.floor)`. This delegates to the combat system's existing AoE handler which has faction filtering (line 321), proper `applyDamage()` routing, visual feedback hooks, and `onKill` handling. Scroll flavor text preserved in the SCROLL_DEFS callback.
+
+### Fix 2: Cap Arcane Shield duration (MAJOR)
+- **Problem:** Arcane Shield had `duration: 99`, making it effectively permanent. Mage could stack infinite shields with no tactical cost.
+- **Fix:** Changed `duration: 99` → `duration: 10` in the `arcane_shield` ability definition (combat.js). Now lasts 10 turns — enough for a fight, but forces tactical timing.
+
+### Fix 3: Remove dead `isAttackerBehind()` function
+- **Problem:** `isAttackerBehind()` (combat.js:579-591) was defined but never called anywhere in the codebase. It was old backstab-facing code replaced by the stealth-based backstab rework.
+- **Fix:** Deleted the entire function (13 lines). Confirmed via grep that no file references `isAttackerBehind`.

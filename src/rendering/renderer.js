@@ -297,6 +297,9 @@
 
     // Draw floating damage number particles
     for (const p of particles) {
+      const tileX = Math.floor(p.x / TILE_SIZE);
+      const tileY = Math.floor(p.y / TILE_SIZE);
+      if (!visibleTiles || !visibleTiles.has(tileX + ',' + tileY)) continue;
       const screenX = p.x - camX;
       const floatOffset = (1 - p.life) * 40;
       const screenY = p.y - camY - floatOffset;

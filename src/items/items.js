@@ -197,22 +197,8 @@
 
   // ── Scroll Effect Helpers ───────────────────────────────────
   function _aoeFireball(entity) {
-    const floor = entity.floor;
-    const entities = GameState.getEntitiesOnFloor(floor);
-    for (const e of entities) {
-      if (e.id === entity.id) continue;
-      if (Utils.chebyshevDist(entity.x, entity.y, e.x, e.y) <= 3) {
-        const dmg = 15 + Math.floor((_rng || Utils.createRNG(Date.now())).random() * 10);
-        e.hp -= dmg;
-        GameState.addMessage(`${e.name} takes ${dmg} fire damage!`, 'combat');
-        if (e.hp <= 0) {
-          e.alive = false;
-          GameState.addMessage(`${e.name} is incinerated!`, 'combat');
-          if (window.CombatSystem && CombatSystem.onKill) {
-            CombatSystem.onKill(entity, e);
-          }
-        }
-      }
+    if (window.CombatSystem && CombatSystem.aoeAttack) {
+      CombatSystem.aoeAttack(entity, entity.x, entity.y, 3, 2, entity.floor);
     }
   }
 
@@ -627,10 +613,18 @@
     // Remove stat mods
     removeEquipmentMods(entity, item);
 
-    // Move to inventory
+    // Move to inventory (or drop if full)
     entity.equipment[slot] = null;
-    entity.inventory.push(item);
-    GameState.addMessage(`Unequipped ${getDisplayName(item)}.`, 'loot');
+    if (entity.inventory.length >= MAX_INVENTORY_SIZE) {
+      item.x = entity.x;
+      item.y = entity.y;
+      item.floor = entity.floor;
+      GameState.addGroundItem(item);
+      GameState.addMessage(`Inventory full — ${getDisplayName(item)} dropped on the ground.`, 'warning');
+    } else {
+      entity.inventory.push(item);
+      GameState.addMessage(`Unequipped ${getDisplayName(item)}.`, 'loot');
+    }
     return true;
   }
 
@@ -719,7 +713,7 @@
    */
   function dropLoot(monster, floorIndex) {
     const dropped = [];
-    const rng = Utils.createRNG(Date.now() + (monster.id || 0));
+    const rng = Utils.createRNG(GameState.state.seed + GameState.getTurnCounter() * 31 + (monster.id || 0));
 
     // Base drop chance: 35%. Bosses always drop.
     const isBoss = monster.tags && monster.tags.includes('boss');

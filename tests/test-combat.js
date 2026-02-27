@@ -687,4 +687,122 @@
       expect(player.regenCooldown).toBe(7);
     });
   });
+
+  // ── Backstab Stealth Multiplier ───────────────────────────
+  describe('CombatSystem — backstab stealth multiplier', function () {
+    it('backstab deals 3× damage when user.stealthed = true', function () {
+      const player = makePlayer({ classKey: 'ROGUE' });
+      player.stealthed = true;
+      const monster = makeMonster({ hp: 500, maxHp: 500 });
+      monster.hasSeenPlayer = true; // only stealth flag drives 3×
+
+      let stealthTotal = 0;
+      for (let i = 0; i < 30; i++) {
+        monster.hp = 500; monster.alive = true; monster.statusEffects = [];
+        player.stamina = 100;
+        player.stealthed = true;
+        CombatSystem.useAbility('backstab', player, monster);
+        stealthTotal += 500 - monster.hp;
+      }
+
+      // Compare with non-stealth (1.5×)
+      let normalTotal = 0;
+      for (let i = 0; i < 30; i++) {
+        monster.hp = 500; monster.alive = true; monster.statusEffects = [];
+        player.stamina = 100;
+        player.stealthed = false;
+        monster.hasSeenPlayer = true;
+        CombatSystem.useAbility('backstab', player, monster);
+        normalTotal += 500 - monster.hp;
+      }
+
+      // 3× avg should be roughly double 1.5× avg
+      expect(stealthTotal).toBeGreaterThan(normalTotal);
+    });
+
+    it('backstab deals 1.5× damage when user.stealthed = false and target has seen player', function () {
+      const player = makePlayer({ classKey: 'ROGUE' });
+      player.stealthed = false;
+      const monster = makeMonster({ hp: 500, maxHp: 500, defense: 0 });
+      monster.hasSeenPlayer = true;
+
+      // Collect backstab damage samples
+      let backstabTotal = 0;
+      for (let i = 0; i < 30; i++) {
+        monster.hp = 500; monster.alive = true; monster.statusEffects = [];
+        player.stamina = 100;
+        CombatSystem.useAbility('backstab', player, monster);
+        backstabTotal += 500 - monster.hp;
+      }
+
+      // Collect melee damage samples (1× multiplier)
+      let meleeTotal = 0;
+      for (let i = 0; i < 30; i++) {
+        monster.hp = 500; monster.alive = true; monster.statusEffects = [];
+        CombatSystem.meleeAttack(player, monster);
+        meleeTotal += 500 - monster.hp;
+      }
+
+      // 1.5× should be higher than 1× on average
+      expect(backstabTotal / 30).toBeGreaterThan(meleeTotal / 30);
+    });
+
+    it('stealth is cleared after backstab attack', function () {
+      const player = makePlayer({ classKey: 'ROGUE' });
+      player.stealthed = true;
+      const monster = makeMonster({ hp: 500, maxHp: 500 });
+      monster.hasSeenPlayer = true;
+
+      CombatSystem.useAbility('backstab', player, monster);
+      expect(player.stealthed).toBe(false);
+    });
+
+    it('taking damage clears stealth', function () {
+      const player = makePlayer({ classKey: 'ROGUE' });
+      player.stealthed = true;
+
+      CombatSystem.applyDamage(player, 5);
+      expect(player.stealthed).toBe(false);
+    });
+  });
+
+  // ── AoE Faction Filter ────────────────────────────────────
+  describe('CombatSystem — AoE faction filter', function () {
+    it('player AoE does not hit entities with type player', function () {
+      const player = makePlayer();
+      setupFloor();
+      // Create a second "player" entity nearby (e.g. summon/ally)
+      const ally = GameState.createEntity({
+        name: 'Ally', type: 'player',
+        x: 7, y: 5, floor: 0, hp: 100, maxHp: 100, attack: 5, defense: 5
+      });
+      ally.statusEffects = [];
+      GameState.addEntity(ally);
+
+      CombatSystem.aoeAttack(player, 7, 5, 2, 1.5, 0);
+      // Ally should not be hit (same type as attacker)
+      expect(ally.hp).toBe(100);
+    });
+
+    it('monster AoE does not hit entities with type monster', function () {
+      const player = makePlayer();
+      setupFloor();
+      const attacker = makeMonster({ name: 'Dragon', hp: 200, maxHp: 200, x: 5, y: 6 });
+      const bystander = makeMonster({ name: 'Goblin', hp: 50, maxHp: 50, x: 6, y: 6 });
+
+      CombatSystem.aoeAttack(attacker, 6, 6, 2, 1.5, 0);
+      // Bystander is same type as attacker — should not be hit
+      expect(bystander.hp).toBe(50);
+    });
+
+    it('player AoE does hit entities with type monster', function () {
+      const player = makePlayer();
+      setupFloor();
+      const monster = makeMonster({ hp: 200, maxHp: 200, x: 6, y: 5 });
+
+      const hits = CombatSystem.aoeAttack(player, 6, 5, 2, 1.5, 0);
+      expect(hits).toBeGreaterThan(0);
+      expect(monster.hp).toBeLessThan(200);
+    });
+  });
 })();

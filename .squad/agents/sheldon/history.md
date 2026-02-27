@@ -182,3 +182,18 @@
 - **Bug:** Old formula `(floor+1)*100 + level*50 + xp - turnCounter/10` penalized every turn equally. Since regen cooldowns mechanically force players to wait, this punished necessary gameplay.
 - **Fix:** New formula: `floor*1000 + level*200 + xp - max(0, turns - floor*100)*2`. Floor reached is now the dominant factor (1000/floor vs old 100). Turn penalty only applies above a generous threshold of 100 turns per floor. Efficient play is rewarded but regen waiting isn't punished.
 - **Impact:** `calculateScore()` rewritten. Victory screen still applies 2x multiplier. High score display unchanged (already shows score + floor, no turn count in listing).
+
+## Sprint Fixes #2 (2026-02-27)
+
+### Fix 1: Trap Damage Bypasses applyDamage() (main.js:281)
+- **Bug:** `player.hp -= trapDmg` skipped shields (Arcane Shield), evade, vulnerability, and death check. HP could go negative without triggering permadeath.
+- **Fix:** Replaced raw HP subtraction with `CombatSystem.applyDamage(player, trapDmg)`. Now uses `dealt` (actual damage after shields/evade) for messages and visual feedback. Added death check (`player.hp <= 0` → `handleDeath()`) with early return.
+- **Impact:** Trap damage now respects all combat mitigation and triggers permadeath correctly.
+
+### Fix 2: floorTurns Not Saved/Loaded (gameState.js createEntity)
+- **Bug:** `floorTurns` was set ad-hoc (`player.floorTurns = 0`) but not in the entity schema. After save/load JSON round-trip, `floorTurns` would reset to undefined, breaking the wandering monster timer.
+- **Fix:** Added `floorTurns: opts.floorTurns ?? 0`, `stealthed: opts.stealthed || false`, and `hasSeenPlayer: opts.hasSeenPlayer || false` to `createEntity()` return object. These fields now survive JSON serialization/deserialization.
+- **Impact:** Wandering monster timer persists across save/load. Stealth and player-seen flags also survive.
+
+### Fix 3: Integration Manifest Updated
+- **Added 4 entries:** `main.js → MonsterFactory.getTemplatesForFloor()`, `main.js → MonsterFactory.createMonster()`, `main.js → CombatSystem.init()`, `main.js → AISystem.init()`. All marked ✅ Wired.

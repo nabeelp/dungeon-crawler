@@ -471,7 +471,7 @@
       cost: { mana: 25 },
       type: 'self',
       execute(user) {
-        addStatusEffect(user, 'shielded', { absorb: 30, duration: 99 });
+        addStatusEffect(user, 'shielded', { absorb: 30, duration: 10 });
         GameState.addMessage(`${user.name} conjures an Arcane Shield (absorbs 30 damage).`, 'combat');
         return true;
       }
@@ -574,21 +574,6 @@
       }
     }
   };
-
-  // ── Helper: check if attacker is behind target ────────────
-  function isAttackerBehind(attacker, target) {
-    // Determine target's facing based on last known direction
-    // Fallback: target faces toward the player if it's a monster
-    const player = GameState.getPlayer();
-    if (!player || target.type === 'player') return false;
-    // Target faces toward player; attacker is behind if on the opposite side
-    const faceDx = Math.sign(player.x - target.x);
-    const faceDy = Math.sign(player.y - target.y);
-    const atkDx = Math.sign(attacker.x - target.x);
-    const atkDy = Math.sign(attacker.y - target.y);
-    // Behind = attacker direction is opposite to face direction
-    return (faceDx !== 0 && atkDx === -faceDx) || (faceDy !== 0 && atkDy === -faceDy);
-  }
 
   function fail(msg) {
     GameState.addMessage(msg, 'combat');
