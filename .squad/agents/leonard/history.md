@@ -399,3 +399,17 @@ The `regenCooldown` field is initialized to `0` in `createEntity()` (gameState.j
 ### Fix 3: Remove dead `isAttackerBehind()` function
 - **Problem:** `isAttackerBehind()` (combat.js:579-591) was defined but never called anywhere in the codebase. It was old backstab-facing code replaced by the stealth-based backstab rework.
 - **Fix:** Deleted the entire function (13 lines). Confirmed via grep that no file references `isAttackerBehind`.
+
+### Retro Action Items — Three Fixes (2026-02-27)
+
+### Fix 1: Remove hasSeenPlayer backstab backdoor (P1)
+- **Problem:** `combat.js:489` — `!target.hasSeenPlayer` granted free 3× without Evade, making Evade→Backstab pointless since every first-contact was automatically 3×.
+- **Fix:** Removed `!target.hasSeenPlayer` condition from backstab. Now `const isStealth = !!user.stealthed;` — 3× damage ONLY from Evade stealth. Also removed `entity.hasSeenPlayer = true` from ai.js `processMonsterTurn` since it's no longer referenced.
+
+### Fix 2: DoT HP floor guard (P2)
+- **Problem:** `combat.js:106,122` — Poison/bleed ticks did raw `entity.hp -= effect.damage`, could push HP below 0.
+- **Fix:** Changed both poison and bleed ticks to `entity.hp = Math.max(0, entity.hp - effect.damage)`. Added design comment documenting that DoT intentionally bypasses shields (internal damage) but respects HP floor and death handling.
+
+### Fix 3: AI stealth detection check (P2)
+- **Problem:** `ai.js` — Monsters detected and attacked stealthed players at full 10-tile range. Stealth only affected backstab multiplier, not detection.
+- **Fix:** Added guard in `processMonsterTurn`: if `player.stealthed && dist > 1`, monster skips turn. Adjacent monsters (dist ≤ 1) still detect stealthed player. Makes Evade→Backstab a real tactical approach move.

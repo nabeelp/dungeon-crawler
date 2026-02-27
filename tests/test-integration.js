@@ -271,7 +271,7 @@
       GameState.setCurrentFloor(9);
 
       const baseScore = HUD.calculateScore(player);
-      const victoryScore = HUD.calculateScore(player) * 2;
+      const victoryScore = HUD.calculateScore(player, true);
 
       expect(victoryScore).toBe(baseScore * 2);
       expect(victoryScore).toBeGreaterThan(0);

@@ -268,6 +268,11 @@
           if (!visibleTiles.has(tx + ',' + ty)) break;
           const rangeTarget = GameState.getEntityAt(tx, ty, player.floor);
           if (rangeTarget && rangeTarget.type === 'monster' && rangeTarget.alive) {
+            const dirName = dx === 0 && dy < 0 ? 'north' : dx === 0 && dy > 0 ? 'south'
+              : dy === 0 && dx < 0 ? 'west' : dy === 0 && dx > 0 ? 'east'
+              : dx > 0 && dy < 0 ? 'northeast' : dx > 0 && dy > 0 ? 'southeast'
+              : dx < 0 && dy < 0 ? 'northwest' : 'southwest';
+            GameState.addMessage(`Arcane Bolt fires ${dirName} at ${rangeTarget.name}!`, 'ability');
             CombatSystem.meleeAttack(player, rangeTarget);
             break;
           }
@@ -343,6 +348,15 @@
     const floor = player.floor;
     const tiles = GameState.getCurrentTiles();
     if (!tiles) return;
+
+    // Cap wandering monsters: skip spawn if 6+ alive monsters on this floor
+    const aliveMonsters = GameState.state.entities.filter(
+      e => e.type === 'monster' && e.floor === floor && e.hp > 0
+    );
+    if (aliveMonsters.length >= 6) {
+      GameState.addMessage('The dungeon stirs restlessly...', 'system');
+      return;
+    }
 
     // Collect candidate tiles: walkable, not visible, min 5 tiles from player, unoccupied
     const candidates = [];
@@ -522,7 +536,7 @@
   }
 
   function handleVictory(player) {
-    const score = HUD.calculateScore(player) * 2;
+    const score = HUD.calculateScore(player, true);
     HUD.saveHighScore({
       name: player.name,
       className: player.classKey ? CLASSES[player.classKey].name : 'Adventurer',

@@ -103,7 +103,8 @@
     entity.statusEffects = entity.statusEffects.filter(effect => {
       // Poison tick
       if (effect.type === 'poisoned' && effect.damage && entity.alive) {
-        entity.hp -= effect.damage;
+        // Design: DoT bypasses shields (internal damage) but respects HP floor and death handling
+        entity.hp = Math.max(0, entity.hp - effect.damage);
         GameState.addMessage(`${entity.name} takes ${effect.damage} poison damage.`, 'combat');
         if (window.Renderer) {
           Renderer.spawnDamageNumber(entity.x, entity.y, effect.damage, entity.type === 'player' ? 'player_damage' : 'enemy_damage');
@@ -119,7 +120,8 @@
       }
       // Bleed tick
       if (effect.type === 'bleed' && effect.damage && entity.alive) {
-        entity.hp -= effect.damage;
+        // Design: DoT bypasses shields (internal damage) but respects HP floor and death handling
+        entity.hp = Math.max(0, entity.hp - effect.damage);
         GameState.addMessage(`${entity.name} takes ${effect.damage} bleed damage.`, 'combat');
         if (window.Renderer) {
           Renderer.spawnDamageNumber(entity.x, entity.y, effect.damage, entity.type === 'player' ? 'player_damage' : 'enemy_damage');
@@ -485,8 +487,7 @@
       execute(user, target) {
         const dist = Utils.chebyshevDist(user.x, user.y, target.x, target.y);
         if (dist > 1) return fail('Too far for Backstab.');
-        // Full 3× when stealthed (from Evade) or target hasn't detected player yet
-        const isStealth = !!user.stealthed || !target.hasSeenPlayer;
+        const isStealth = !!user.stealthed;
         const multiplier = isStealth ? 3 : 1.5;
         const rawDmg = Math.floor(calcBaseDamage(user, target) * multiplier);
         const dealt = applyDamage(target, rawDmg);

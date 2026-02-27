@@ -159,7 +159,7 @@
   });
 
   // ── Wandering Monster Interval ─────────────────────────────
-  const WANDERING_MONSTER_INTERVAL = 25;
+  const WANDERING_MONSTER_INTERVAL = 15;
 
   // ── Game Phases ─────────────────────────────────────────────
   const PHASES = Object.freeze({

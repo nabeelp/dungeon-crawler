@@ -197,3 +197,40 @@
 
 ### Fix 3: Integration Manifest Updated
 - **Added 4 entries:** `main.js → MonsterFactory.getTemplatesForFloor()`, `main.js → MonsterFactory.createMonster()`, `main.js → CombatSystem.init()`, `main.js → AISystem.init()`. All marked ✅ Wired.
+
+## Design Review #3 (2026-02-27)
+
+### Ceremony: Post-Fix Design Review
+- **Scope:** Architecture health, integration manifest, entity schema, dead code, overall assessment
+- **Verdict:** A-. All prior critical bugs resolved. Remaining items are minor/cosmetic.
+
+### Issues Found
+1. **[Minor] Boss fields not in entity schema** — `_enraged`, `_telegraphing`, `_summonedPhase2`, `_summonedPhase3` are set ad-hoc in ai.js (lines 334-387) but not initialized in `createEntity()`. These survive JSON save/load because they're simple booleans that default to falsy, but this violates the "centralize entity schema" policy.
+2. **[Minor] Math.random() fallbacks** — combat.js:34, ai.js:21 still have `Math.random()` fallback. Init is wired so they never fire, but "fail loudly" policy says these should throw, not degrade.
+3. **[Cosmetic] TILES.WATER dead code** — constants.js:19, renderer.js:23. Defined and colored but never generated.
+4. **[Cosmetic] Renderer encapsulation** — renderer.js:212 accesses `GameState.state.groundItems` directly instead of using `GameState.getGroundItemsAt()`.
+
+### What's Working Well
+- All prior critical bugs (duplicate player ref, self-targeting, duplicate checkLevelUp, trap bypass, fireball routing, dead isAttackerBehind) are confirmed resolved
+- Integration manifest is complete and accurate (77 entries, all ✅)
+- Entity schema now includes floorTurns, stealthed, hasSeenPlayer, statusEffects, tags, xpValue, _buffs
+- Trap damage correctly routes through applyDamage with death check
+- Fireball correctly routes through aoeAttack with faction filtering
+- Arcane Shield capped at 10 turns (combat.js:474)
+- Save/load re-links player reference (main.js:601-606)
+- RNG determinism: trap seed uses game seed + turn counter
+- 11+ new tests added covering recent fixes
+
+### Overall Health: 8.5/10 (A-)
+
+## Retro Action Items (2026-02-27)
+
+### Fix 1: Wandering Monster Interval Reduced to 15 Turns
+- **constants.js:** Changed `WANDERING_MONSTER_INTERVAL` from 25 to 15. Safe gap reduced from 17-20 turns to 7-10 turns after regen cooldown expires.
+- **main.js `spawnWanderingMonster()`:** Added monster cap — counts alive monsters on the current floor before spawning. If 6+ alive monsters exist, skips the spawn and shows "The dungeon stirs restlessly..." message. Prevents infinite accumulation on long stays.
+
+### Fix 2: Score Victory Multiplier Single Source of Truth
+- **hud.js `calculateScore()`:** Added optional `victory` parameter (default falsy). When truthy, returns `score * 2`. Replaces the duplicated `* 2` in both hud.js victory screen and main.js `handleVictory()`.
+- **hud.js `drawVictoryScreen()`:** Changed from `calculateScore(player) * 2` to `calculateScore(player, true)`.
+- **main.js `handleVictory()`:** Changed from `HUD.calculateScore(player) * 2` to `HUD.calculateScore(player, true)`.
+- **test-integration.js:** Updated victory score test to use `HUD.calculateScore(player, true)` instead of manual `* 2`.

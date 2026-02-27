@@ -142,3 +142,10 @@
 ### Damage Particles FOV Fix (Howard)
 
 - **Fix — Particles now respect FOV:** Added a visibility check to the damage particle rendering loop in `renderer.js`. Before drawing each particle, computes its tile coordinates and checks against the `visibleTiles` set (already in scope as the `render()` parameter). Particles on tiles outside FOV are skipped via `continue`. This prevents floating damage numbers from poison/bleed ticks on fog-hidden monsters from appearing beyond the player's view. Also guards against null `visibleTiles` with `!visibleTiles ||` for safety.
+
+### Ranged Attack Feedback (Howard)
+
+- **Problem:** Mage's Arcane Bolt auto-fires silently on movement. Player moves one tile and unknowingly attacks a monster — hostile in a permadeath game.
+- **Fix — Directional feedback message before attack:** Added `GameState.addMessage()` call BEFORE `CombatSystem.meleeAttack()` in the auto-fire loop (main.js:275). Message format: `"Arcane Bolt fires [direction] at [monster name]!"` using a new `'ability'` message type. Direction is computed from the movement `dx`/`dy` vector, covering all 8 compass directions.
+- **Fix — New 'ability' message color:** Added `ability: '#BB77FF'` (purple) to `msgColors` in hud.js. Distinct from combat red and system blue so the auto-fire alert stands out in the log.
+- **Settings toggle:** No settings/config system exists in the codebase, so no `autoRanged` toggle was added. The feedback message is the mitigation. Damage numbers and screen shake already fire through `CombatSystem.meleeAttack() → postAttackMsg()` pipeline — no additional visual hooks needed.

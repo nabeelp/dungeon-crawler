@@ -279,7 +279,7 @@
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
 
-    const msgColors = { info: '#CCC', combat: '#FF6666', loot: '#FFD700', system: '#66CCFF' };
+    const msgColors = { info: '#CCC', combat: '#FF6666', loot: '#FFD700', system: '#66CCFF', ability: '#BB77FF' };
 
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
@@ -511,7 +511,7 @@
       ctx.fillText('Conquered all 10 floors!', w / 2, h * 0.40);
       ctx.fillText('Level ' + player.level + '  |  Turns: ' + GameState.getTurnCounter(), w / 2, h * 0.45);
 
-      const score = calculateScore(player) * 2; // Bonus for winning
+      const score = calculateScore(player, true);
       ctx.fillStyle = '#FFD700';
       ctx.font = 'bold 24px monospace';
       ctx.fillText('Final Score: ' + score, w / 2, h * 0.52);
@@ -522,7 +522,7 @@
     ctx.fillText('Press ENTER to Return to Title', w / 2, h * 0.65);
   }
 
-  function calculateScore(player) {
+  function calculateScore(player, victory) {
     const floor = GameState.getCurrentFloor() + 1;
     const turns = GameState.getTurnCounter();
     const baseScore = floor * 1000
@@ -530,7 +530,8 @@
       + player.xp;
     // Only penalize turns above a generous threshold (100 turns per floor)
     const excessTurns = Math.max(0, turns - floor * 100);
-    return Math.max(0, baseScore - excessTurns * 2);
+    const score = Math.max(0, baseScore - excessTurns * 2);
+    return victory ? score * 2 : score;
   }
 
   // ── Help Screen Overlay ─────────────────────────────────────
