@@ -283,11 +283,11 @@
         screenY + TILE_SIZE / 2
       );
 
-      // HP bar above monster
+      // HP bar below monster
       const barW = TILE_SIZE;
       const barH = 3;
       const barX = screenX;
-      const barY = screenY - barH - 1;
+      const barY = screenY + TILE_SIZE + 1;
       const hpRatio = entity.maxHp > 0 ? Math.max(0, entity.hp / entity.maxHp) : 0;
       ctx.fillStyle = '#440000';
       ctx.fillRect(barX, barY, barW, barH);
