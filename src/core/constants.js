@@ -12,12 +12,13 @@
   const TILES = Object.freeze({
     WALL:        0,
     FLOOR:       1,
-    DOOR:        2,
+    DOOR:        2,   // closed door — opaque, blocks movement
     STAIRS_DOWN: 3,
     STAIRS_UP:   4,
     CORRIDOR:    5,
     WATER:       6,
-    TRAP:        7
+    TRAP:        7,
+    DOOR_OPEN:   8    // open door — transparent, walkable
   });
 
   // Reverse lookup: id → name
@@ -28,7 +29,7 @@
   // Which tiles can be walked on
   const WALKABLE_TILES = Object.freeze(new Set([
     TILES.FLOOR,
-    TILES.DOOR,
+    TILES.DOOR_OPEN,
     TILES.STAIRS_DOWN,
     TILES.STAIRS_UP,
     TILES.CORRIDOR,

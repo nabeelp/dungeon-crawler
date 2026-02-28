@@ -21,7 +21,8 @@
     [TILES.STAIRS_UP]:   '#C0C0C0',
     [TILES.CORRIDOR]:    '#6B5B3A',
     [TILES.WATER]:       '#4169E1',
-    [TILES.TRAP]:        '#FF4500'
+    [TILES.TRAP]:        '#FF4500',
+    [TILES.DOOR_OPEN]:   '#D2691E'
   };
 
   let canvas = null;
@@ -197,6 +198,19 @@
             screenY + TILE_SIZE / 2
           );
           ctx.globalAlpha = 1.0;
+        }
+
+        // Door symbols
+        if (tileType === TILES.DOOR || tileType === TILES.DOOR_OPEN) {
+          ctx.fillStyle = '#FFF';
+          ctx.font = 'bold ' + (TILE_SIZE * 0.7) + 'px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(
+            tileType === TILES.DOOR ? '+' : '/',
+            screenX + TILE_SIZE / 2,
+            screenY + TILE_SIZE / 2
+          );
         }
 
         // Fog overlay for explored-but-not-visible tiles

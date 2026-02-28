@@ -438,12 +438,13 @@
     ctx.font = '12px monospace';
     ctx.fillText('Move: Arrows/WASD  Diagonal: Numpad/YUBN', w / 2, ctrlY + 20);
     ctx.fillText('Abilities: 1-3    Pick Up: G    Stairs: > <', w / 2, ctrlY + 36);
-    ctx.fillText('Inventory: I    Wait: Space    Help: ?', w / 2, ctrlY + 52);
+    ctx.fillText('Inventory: I    Wait: Space    Close Door: C', w / 2, ctrlY + 52);
+    ctx.fillText('Help: ?    (Walk into closed doors to open)', w / 2, ctrlY + 68);
 
     // High scores
     loadHighScores();
     if (highScores.length > 0) {
-      const hsY = ctrlY + 80;
+      const hsY = ctrlY + 96;
       ctx.fillStyle = '#FFD700';
       ctx.font = 'bold 16px monospace';
       ctx.fillText('── High Scores ──', w / 2, hsY);
@@ -577,6 +578,8 @@
     helpLine('> or .  to descend stairs (stand on gold > tile)');
     helpLine('< or ,  to ascend stairs (stand on silver < tile)');
     helpLine('G  to pick up items from the ground');
+    helpLine('C  to close an adjacent open door');
+    helpLine('Move into closed doors (+) to open them');
     helpLine('Space or 5  to wait one turn');
     y += sectionGap;
 

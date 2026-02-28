@@ -185,6 +185,8 @@
       acted = tryPickup(player);
     } else if (action.type === 'ability') {
       acted = tryAbility(player, action.index);
+    } else if (action.type === 'close_door') {
+      acted = tryCloseDoor(player);
     } else if (action.type === 'wait') {
       acted = true;
     }
@@ -241,6 +243,14 @@
     if (!tiles) return false;
 
     const tileType = tiles[newY][newX];
+
+    // Opening a closed door costs a turn but doesn't move the player
+    if (tileType === TILES.DOOR) {
+      tiles[newY][newX] = TILES.DOOR_OPEN;
+      GameState.addMessage('You open the door.', 'info');
+      return true;
+    }
+
     if (!WALKABLE_TILES.has(tileType)) return false;
 
     // Check for entity at target
@@ -301,6 +311,36 @@
     }
 
     return true;
+  }
+
+  function tryCloseDoor(player) {
+    const tiles = GameState.getCurrentTiles();
+    if (!tiles) return false;
+
+    const dirs = [{ dx: 0, dy: -1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }, { dx: 1, dy: 0 }];
+    let doorPos = null;
+
+    for (const d of dirs) {
+      const nx = player.x + d.dx;
+      const ny = player.y + d.dy;
+      if (!Utils.inBounds(nx, ny)) continue;
+      if (tiles[ny][nx] === TILES.DOOR_OPEN) {
+        // Don't close if an entity is standing on it
+        const occupant = GameState.getEntityAt(nx, ny, player.floor);
+        if (occupant && occupant.alive) continue;
+        doorPos = { x: nx, y: ny };
+        break;
+      }
+    }
+
+    if (doorPos) {
+      tiles[doorPos.y][doorPos.x] = TILES.DOOR;
+      GameState.addMessage('You close the door.', 'info');
+      return true;
+    }
+
+    GameState.addMessage("There's no open door nearby.", 'info');
+    return false;
   }
 
   function tryDescend(player) {
@@ -740,6 +780,12 @@
     if (key === 'i' || key === 'I') {
       HUD.toggleInventory();
       requestRender();
+      return;
+    }
+
+    // Close door
+    if (key === 'c' || key === 'C') {
+      processPlayerAction({ type: 'close_door' });
       return;
     }
 

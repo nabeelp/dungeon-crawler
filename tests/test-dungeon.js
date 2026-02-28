@@ -13,6 +13,11 @@
   const SEED = 42;
   const VALID_TILES = new Set(Object.values(TILES));
 
+  // Helper: check if a tile is passable (walkable or closed door)
+  function isPassable(tileType) {
+    return WALKABLE_TILES.has(tileType) || tileType === TILES.DOOR;
+  }
+
   // Helper: BFS to find all reachable walkable tiles from a starting point
   function bfsReachable(tiles, startX, startY) {
     const visited = new Set();
@@ -32,7 +37,7 @@
         if (n.x < 0 || n.y < 0 || n.x >= MAP_WIDTH || n.y >= MAP_HEIGHT) continue;
         const k = key(n.x, n.y);
         if (visited.has(k)) continue;
-        if (WALKABLE_TILES.has(tiles[n.y][n.x])) {
+        if (isPassable(tiles[n.y][n.x])) {
           visited.add(k);
           queue.push(n);
         }
@@ -46,7 +51,7 @@
     let count = 0;
     for (let y = 0; y < MAP_HEIGHT; y++) {
       for (let x = 0; x < MAP_WIDTH; x++) {
-        if (WALKABLE_TILES.has(tiles[y][x])) count++;
+        if (isPassable(tiles[y][x])) count++;
       }
     }
     return count;
@@ -56,7 +61,7 @@
   function findWalkable(tiles) {
     for (let y = 0; y < MAP_HEIGHT; y++) {
       for (let x = 0; x < MAP_WIDTH; x++) {
-        if (WALKABLE_TILES.has(tiles[y][x])) return { x, y };
+        if (isPassable(tiles[y][x])) return { x, y };
       }
     }
     return null;

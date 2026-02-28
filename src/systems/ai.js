@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const { MAP_WIDTH, MAP_HEIGHT, WALKABLE_TILES } = Constants;
+  const { MAP_WIDTH, MAP_HEIGHT, WALKABLE_TILES, TILES } = Constants;
 
   // ── Seeded RNG Reference ──────────────────────────────────
   let _rng = null;
@@ -53,7 +53,7 @@
         if (n.x < 0 || n.x >= MAP_WIDTH || n.y < 0 || n.y >= MAP_HEIGHT) continue;
         const nKey = key(n.x, n.y);
         if (closed.has(nKey)) continue;
-        if (!WALKABLE_TILES.has(tiles[n.y][n.x])) continue;
+        if (!WALKABLE_TILES.has(tiles[n.y][n.x]) && tiles[n.y][n.x] !== TILES.DOOR) continue;
 
         // Allow moving to the goal even if occupied (we want to reach adjacency)
         const occupant = GameState.getEntityAt(n.x, n.y, floor);
@@ -100,6 +100,12 @@
     const path = astar(entity.x, entity.y, targetX, targetY, tiles, entity.floor);
     if (path && path.length > 0) {
       const next = path[0];
+      // Open closed door instead of moving through it (consumes turn)
+      if (tiles[next.y][next.x] === TILES.DOOR) {
+        tiles[next.y][next.x] = TILES.DOOR_OPEN;
+        GameState.addMessage(`${entity.name} opens a door.`, 'info');
+        return true;
+      }
       // Don't walk onto an occupied tile
       const occupant = GameState.getEntityAt(next.x, next.y, entity.floor);
       if (!occupant || !occupant.alive) {

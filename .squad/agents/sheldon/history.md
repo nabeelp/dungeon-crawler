@@ -234,3 +234,18 @@
 - **hud.js `drawVictoryScreen()`:** Changed from `calculateScore(player) * 2` to `calculateScore(player, true)`.
 - **main.js `handleVictory()`:** Changed from `HUD.calculateScore(player) * 2` to `HUD.calculateScore(player, true)`.
 - **test-integration.js:** Updated victory score test to use `HUD.calculateScore(player, true)` instead of manual `* 2`.
+
+## Door Placement + Open/Close Mechanics (2026-02-27)
+
+### Fix 1: Smart Door Placement (generator.js)
+- **Problem:** Old `placeDoors()` scanned ALL room perimeter corridor tiles with 30% random chance, causing doors at corners, double doors on adjacent tiles, and doors in illogical positions.
+- **Fix:** Rewrote `placeDoors()` with doorway validation algorithm. Only places doors on corridor tiles that form proper choke points: requires walls on both perpendicular sides (forming a doorframe). De-duplicates by tracking placed positions and skipping if an adjacent door already exists. Uses 60% placement chance on valid doorways.
+- **Impact:** Doors now only appear at structurally sound passage points between rooms and corridors.
+
+### Fix 2: Open/Close Door State (constants.js, renderer.js, main.js, ai.js, hud.js)
+- **constants.js:** Added `TILES.DOOR_OPEN` (id 8). Removed `TILES.DOOR` from `WALKABLE_TILES` (closed doors block movement). Added `TILES.DOOR_OPEN` to `WALKABLE_TILES`. `OPAQUE_TILES` unchanged — closed doors block LOS, open doors don't.
+- **renderer.js:** Added `DOOR_OPEN` color (`#D2691E` lighter brown). Added door symbols: closed = `+`, open = `/` (roguelike convention).
+- **main.js `tryMove()`:** Moving into a closed door opens it (changes tile to `DOOR_OPEN`), costs a turn but doesn't step through. Added `tryCloseDoor()` function: pressing 'C' closes an adjacent open door (checks for entity occupancy). Added `close_door` action type in `processPlayerAction()` and key binding in `handleGameInput()`.
+- **ai.js:** A* pathfinding now treats `TILES.DOOR` as traversable. `moveToward()` opens closed doors when the next path step is a door tile (consumes the monster's turn without moving). Monsters can now path through doors.
+- **hud.js:** Updated help screen and title screen controls to document door mechanics.
+- **tests/test-dungeon.js:** Updated BFS helpers to treat closed doors as passable for connectivity checks (doors are generated closed but are openable, so connectivity should consider them).
